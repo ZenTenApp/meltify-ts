@@ -1,0 +1,40 @@
+{
+  "name": "meltify-ts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TypeScript port of meltify (meltify-info parity): derive an identity report from an Ed25519 OpenSSH key.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "check:core": "esbuild src/index.ts --bundle --platform=neutral --format=esm --outfile=dist/core-neutral-check.mjs --log-level=warning",
+    "verify": "npm run typecheck && npm run test && npm run check:core && npm run build"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.4.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
+    "@scure/bip32": "^2.4.0",
+    "@scure/bip39": "^2.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.0",
+    "vitest": "^5.0.5"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+meltify-ts — third-party notices
+=================================
+
+This project reimplements behaviour from ZenTenApp/meltify (the repository owner's work)
+and uses the following third-party code and data.
+
+1. bcrypt_pbkdf + Blowfish port
+   File: src/core/crypto/bcrypt-pbkdf.ts
+   Derived from the npm package "bcrypt-pbkdf" v1.0.2, itself a 1:1 port of
+   OpenBSD blowfish.c and bcrypt_pbkdf.c. The only change is replacing its
+   tweetnacl SHA-512 with @noble/hashes.
+   - Blowfish: Copyright 1997 Niels Provos <provos@physnet.uni-hamburg.de>, BSD-3-Clause.
+   - bcrypt_pbkdf: Copyright (c) 2013 Ted Unangst <tedu@openbsd.org>, ISC.
+   - JavaScript performance work: Copyright 2016 Joyent Inc, author Alex Wilson, ISC.
+   The full licence text is preserved in the file header.
+
+2. Monero CryptoNote English word list
+   File: src/core/derive/monero-wordlist.ts
+   Source: monero-project/monero src/mnemonics/english.h (BSD-3-Clause), via
+   github.com/chekist32/go-monero v0.2.5. The list is data, reproduced in its
+   original order.
+
+3. BIP39 English word list
+   Provided by @scure/bip39 (MIT), originating from the Bitcoin BIPs repository.
+
+4. Cryptographic and encoding libraries (MIT, audited, zero-dependency)
+   - @noble/hashes  — SHA-2, SHA-3/Keccak, RIPEMD-160, BLAKE2, HMAC
+   - @noble/curves  — Ed25519, secp256k1, BIP340 Schnorr
+   - @noble/ciphers — AES-256-CTR
+   - @scure/bip39   — BIP39 phrases and seeds
+   - @scure/bip32   — BIP32 HD derivation
+   - @scure/base    — base58/xmr/xrp, bech32/bech32m, base32, base64
+
+5. Golden test vectors
+   test/golden/goldens.ts — values copied from ZenTenApp/meltify
+   internal/derive/golden.go (captured upstream from seedify v1.36.0).
