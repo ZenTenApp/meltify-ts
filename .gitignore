@@ -2,3 +2,5 @@
 node_modules/
 dist/
 coverage/
+examples/browser-demo/app.js
+examples/browser-demo/app.js.map

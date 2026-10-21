@@ -7,9 +7,9 @@ with **`meltify-info` parity**.
 deterministic identity report: the raw seed, a 24-word MELT phrase, Nostr keys, the SSH
 fingerprint/public key, 30 chain addresses, and the Beldex BChat chat ID.
 
-This package is the **isomorphic core plus its test suite**. There is no CLI and no UI yet
-(those are deliberate later milestones). The core has no Node built-ins: it runs in Node or
-a browser bundle.
+This package is the **isomorphic core plus its test suite**, with a small browser demo
+harness under `examples/browser-demo/`. There is no CLI yet (a deliberate later milestone).
+The core has no Node built-ins: it runs in Node or a browser bundle.
 
 > **Secret material.** The report contains the raw private seed. Treat its output as a
 > secret; do not log it or send it anywhere.
@@ -99,6 +99,7 @@ src/core/                 isomorphic (no Node built-ins)
   report.ts                     structured IdentityReport
 src/render/text.ts        terminal renderer (plain + ANSI)
 test/                     vitest suites, golden vectors, ssh-keygen fixtures
+examples/browser-demo/    click-through demo page (esbuild bundle + node:http server)
 ```
 
 Only audited, zero-dependency primitives are used: `@noble/hashes`, `@noble/curves`,
@@ -112,7 +113,21 @@ npm run typecheck # tsc --noEmit
 npm run check:core# bundle src/index.ts with platform=neutral (proves no Node imports)
 npm run build     # emit dist/ + .d.ts
 npm run verify    # all of the above
+npm run demo      # build + serve the browser demo on http://localhost:5173
 ```
+
+### Browser demo
+
+```sh
+npm run demo
+```
+
+Open <http://localhost:5173> and click **Try a throwaway key** — it generates a
+password-protected key in the tab from seed `00..1f`, decrypts it, and derives the full
+report, plus a self-check panel that compares against the pinned Go vectors. See
+[`examples/browser-demo/README.md`](./examples/browser-demo/README.md) for the walkthrough.
+The demo bundles with `--platform=browser`, which is the practical proof that nothing in
+the core reaches for Node.
 
 ## Notes and intentional deviations
 

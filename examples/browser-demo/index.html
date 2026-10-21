@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>meltify-ts · browser demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0d1117;
+        --panel: #161b22;
+        --panel-2: #1c2330;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --public: #7cfc00;
+        --secret: #ff5555;
+        --accent: #58a6ff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px 16px 64px;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      main { max-width: 980px; margin: 0 auto; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 12px; }
+      .sub { color: var(--muted); margin: 0 0 24px; }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 18px;
+        margin-bottom: 18px;
+      }
+      label { display: block; font-weight: 600; margin-bottom: 6px; }
+      .hint { color: var(--muted); font-weight: 400; font-size: 12px; }
+      input[type="password"], input[type="text"], textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      textarea { min-height: 110px; resize: vertical; }
+      input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+      button {
+        font: inherit;
+        font-weight: 600;
+        padding: 9px 16px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        color: var(--text);
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) { border-color: var(--accent); }
+      button.primary { background: #1f6feb; border-color: #1f6feb; }
+      button.primary:hover:not(:disabled) { background: #388bfd; }
+      button:disabled { opacity: .5; cursor: progress; }
+      .check { display: flex; gap: 8px; align-items: center; font-weight: 400; color: var(--muted); }
+      .check input { accent-color: var(--accent); }
+      #error {
+        display: none;
+        margin-top: 14px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #6e2b2b;
+        background: #2d1416;
+        color: #ffb3b3;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 13px;
+        white-space: pre-wrap;
+      }
+      #error.show { display: block; }
+      .blocks { display: grid; gap: 12px; }
+      .block { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+      .block > header {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 7px 12px;
+        background: var(--panel-2);
+        border-bottom: 1px solid var(--border);
+        font-size: 12px;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .block pre {
+        margin: 0;
+        padding: 10px 12px;
+        font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        color: var(--public);
+      }
+      .block.secret pre { color: var(--secret); }
+      .copy {
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 500;
+        background: transparent;
+      }
+      table { width: 100%; border-collapse: collapse; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+      th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+      th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+      td:first-child { color: var(--muted); width: 130px; white-space: nowrap; }
+      td.addr { overflow-wrap: anywhere; color: var(--public); }
+      .meta { color: var(--muted); font-size: 12px; margin-top: 14px; display: flex; gap: 16px; flex-wrap: wrap; }
+      .pill { border: 1px solid var(--border); border-radius: 999px; padding: 1px 10px; }
+      #result { display: none; }
+      #result.show { display: block; }
+      .checks { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+      .checks div { padding: 2px 0; }
+      .ok { color: var(--public); }
+      .bad { color: var(--secret); }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>meltify-ts · browser demo</h1>
+      <p class="sub">
+        Everything below runs locally in this tab.
+      </p>
+
+      <section class="card">
+        <h2>Input</h2>
+        <label for="keyfile">Password-protected Ed25519 OpenSSH key <span class="hint">(id_ed25519)</span></label>
+        <input type="file" id="keyfile" accept=".pem,.key,.txt,text/plain" />
+        <div class="row">
+          <label for="keytext" style="margin: 0">…or paste the key</label>
+        </div>
+        <textarea id="keytext" spellcheck="false" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
+
+        <div class="row" style="margin-top: 14px">
+          <div style="flex: 1 1 260px">
+            <label for="passphrase">Passphrase</label>
+            <input type="password" id="passphrase" autocomplete="off" placeholder="test-passphrase" />
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="primary" id="derive" type="button">Derive identity</button>
+          <button id="demo" type="button">Try a throwaway key</button>
+          <label class="check"><input type="checkbox" id="pin-golden" checked /> pin seed <code>00..1f</code></label>
+        </div>
+
+        <div id="error" role="alert"></div>
+      </section>
+
+      <section class="card" id="result">
+        <h2>Identity</h2>
+        <div class="row" style="margin: 0 0 14px">
+          <label class="check"><input type="checkbox" id="reveal" /> reveal secrets (seed, phrase, nsec)</label>
+        </div>
+        <div class="blocks" id="blocks"></div>
+        <div class="meta" id="meta"></div>
+      </section>
+
+      <section class="card" id="result-addresses" style="display: none">
+        <h2>Addresses</h2>
+        <table>
+          <thead>
+            <tr><th>Label</th><th>Address</th><th></th></tr>
+          </thead>
+          <tbody id="addresses"></tbody>
+        </table>
+        <div class="meta" id="address-meta"></div>
+      </section>
+
+      <section class="card">
+        <h2>Parity self-check</h2>
+        <p class="hint" style="margin: 0 0 10px">
+          Builds a deterministic key from seed <code>00..1f</code>, decrypts it, and compares against the
+          values pinned in the Go test suite.
+        </p>
+        <div class="checks" id="selfcheck">running…</div>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
