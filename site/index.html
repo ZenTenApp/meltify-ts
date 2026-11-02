@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>meltify · identity console</title>
+    <meta
+      name="description"
+      content="Derive a full identity report from a password-protected Ed25519 OpenSSH key. Runs entirely in your browser."
+    />
+    <link rel="stylesheet" href="%CSS%" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230d1117'/%3E%3Cpath d='M16 6l8 10-8 10-8-10z' fill='%2358a6ff'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <a class="skip" href="#views">Skip to content</a>
+
+    <header class="top">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">◈</span>
+        <div class="brand-text">
+          <h1>meltify<span class="dim">-ts</span></h1>
+          <p class="tag">Ed25519 identity console · everything runs in this tab</p>
+        </div>
+      </div>
+      <div class="topmeta">
+        <span class="badge" title="The page ships a connect-src 'none' policy">offline by policy</span>
+        <label class="switch" title="Wipe the derived identity when this tab loses focus">
+          <input type="checkbox" id="autoclear" checked />
+          <span>wipe on tab hide</span>
+        </label>
+        <button type="button" class="btn ghost" id="wipe">Wipe now</button>
+      </div>
+    </header>
+
+    <nav class="tabs" id="tabs" aria-label="Sections">
+      <a href="#/derive" data-tab="derive">Derive</a>
+      <a href="#/report" data-tab="report" data-needs-report>Report</a>
+      <a href="#/chains" data-tab="chains" data-needs-report>Chains</a>
+      <a href="#/compat" data-tab="compat" data-needs-report>meltify-info</a>
+      <a href="#/phrases" data-tab="phrases">Phrase lab</a>
+      <a href="#/keys" data-tab="keys">Key tools</a>
+      <a href="#/selfcheck" data-tab="selfcheck">Self-check</a>
+    </nav>
+
+    <main id="views"></main>
+
+    <footer class="foot">
+      <p>
+        <strong>Treat the output as secret.</strong> The report contains the raw Ed25519 seed. Nothing is
+        uploaded, logged, or stored — the CSP on this page forbids network requests, and the app keeps
+        key material in memory only.
+      </p>
+      <p class="dim">
+        meltify-ts · TypeScript port of <code>meltify-info</code> · masking and export are presentation
+        concerns, not encryption.
+      </p>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="%JS%"></script>
+  </body>
+</html>

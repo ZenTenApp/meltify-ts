@@ -1,0 +1,167 @@
+/**
+ * Report view: the full identity, split into secret and public blocks, with
+ * explicit export actions. Masking is presentational only — say so in the UI.
+ */
+
+import type { IdentityReport } from 'meltify-ts';
+import { copyAction, valueBlock } from '../lib/blocks.ts';
+import { downloadText } from '../lib/download.ts';
+import { el, hint, pill, toast } from '../lib/dom.ts';
+import { clearIdentity, subscribe, type AppState, type Identity } from '../lib/store.ts';
+import type { Ctx } from '../app-types.ts';
+
+const SECRET_FIELDS = [
+  'privateKeyBlock',
+  'seedHex',
+  'mnemonic24',
+  'legacyPhrase',
+  'nsec',
+  'privKeyHex',
+] as const satisfies readonly (keyof IdentityReport)[];
+
+function publicSnapshot(report: IdentityReport): Record<string, unknown> {
+  return {
+    fingerprint: report.fingerprint,
+    publicKeyLine: report.publicKeyLine,
+    npub: report.npub,
+    pubKeyHex: report.pubKeyHex,
+    bchat: report.bchat,
+    addresses: report.addresses,
+  };
+}
+
+function redactedSnapshot(report: IdentityReport): Record<string, unknown> {
+  return { ...publicSnapshot(report), secretFields: '[redacted]' };
+}
+
+function footer(identity: Identity): HTMLElement {
+  return el('div', { class: 'pills' }, [
+    pill(`source: ${identity.source}`),
+    pill(`derive ${identity.elapsedMs.toFixed(1)} ms`),
+    pill(`${identity.report.addresses.length} addresses`),
+    pill(`derived ${new Date(identity.derivedAt).toLocaleTimeString()}`),
+  ]);
+}
+
+export function mountReport(ctx: Ctx): HTMLElement {
+  const root = el('div', { class: 'view' });
+  let revealed = false;
+  let latest: Identity | null = null;
+
+  const emptyState = (): HTMLElement =>
+    el('section', { class: 'card' }, [
+      el('div', { class: 'empty' }, [
+        el('h2', {}, ['No identity yet']),
+        el('p', { class: 'hint' }, ['Derive an identity from a key, or use a throwaway key.']),
+        el('div', { class: 'row', style: 'justify-content: center; margin-top: 14px' }, [
+          el('a', { class: 'btn primary', href: '#/derive' }, ['Go to Derive']),
+        ]),
+      ]),
+    ]);
+
+  const render = (state: AppState): void => {
+    latest = state.identity;
+    const identity = state.identity;
+    if (identity === null) {
+      root.replaceChildren(emptyState());
+      return;
+    }
+    const report = identity.report;
+
+    const revealSwitch = el('input', { type: 'checkbox', checked: revealed });
+    revealSwitch.addEventListener('change', () => {
+      revealed = revealSwitch.checked;
+      render({ identity: latest });
+    });
+
+    const secrets = el('section', { class: 'card' }, [
+      el('div', { class: 'row', style: 'justify-content: space-between' }, [
+        el('h2', { style: 'margin: 0' }, ['Secret material']),
+        el('label', { class: 'switch' }, [revealSwitch, el('span', {}, ['reveal secrets'])]),
+      ]),
+      hint(
+        'Masking is cosmetic — the values live unencrypted in this tab’s memory for as long as the report is loaded.',
+      ),
+      el('div', { class: 'blocks', style: 'margin-top: 14px' }, [
+        valueBlock('private key body', report.privateKeyBlock, {
+          secret: true,
+          revealed,
+          note: 'base64 of openssh-key-v1',
+        }),
+        valueBlock('ed25519 seed', report.seedHex, { secret: true, revealed, note: 'hex, 32 bytes' }),
+        valueBlock('melt phrase', report.mnemonic24, { secret: true, revealed, note: '24 words' }),
+        valueBlock('cryptonote phrase', report.legacyPhrase, {
+          secret: true,
+          revealed,
+          note: '25 words, not printed by meltify-info',
+        }),
+        valueBlock('nostr secret', report.nsec, { secret: true, revealed, note: 'nsec' }),
+        valueBlock('nostr private key', report.privKeyHex, { secret: true, revealed, note: 'hex' }),
+      ]),
+    ]);
+
+    const publicCard = el('section', { class: 'card' }, [
+      el('h2', {}, ['Public identity']),
+      el('div', { class: 'blocks' }, [
+        valueBlock('ssh fingerprint', report.fingerprint, { note: 'SHA256' }),
+        valueBlock('public key', report.publicKeyLine, { note: 'authorized_keys form' }),
+        valueBlock('nostr public', report.npub, { note: 'npub' }),
+        valueBlock('nostr public key', report.pubKeyHex, { note: 'hex' }),
+        valueBlock('bchat chat id', report.bchat, { note: 'beldex' }),
+      ]),
+      footer(identity),
+    ]);
+
+    const exportCard = el('section', { class: 'card tight' }, [
+      el('h2', {}, ['Export']),
+      el('div', { class: 'row' }, [
+        el('button', {
+          type: 'button',
+          class: 'btn',
+          onclick: () => {
+            downloadText(
+              'meltify-public.json',
+              `${JSON.stringify({ generatedAt: new Date(identity.derivedAt).toISOString(), ...redactedSnapshot(report) }, null, 2)}\n`,
+              'application/json',
+            );
+            toast('Public JSON downloaded');
+          },
+        }, ['Download public JSON']),
+        el('button', {
+          type: 'button',
+          class: 'btn',
+          onclick: () => {
+            downloadText(
+              'meltify-full.json',
+              `${JSON.stringify({ generatedAt: new Date(identity.derivedAt).toISOString(), source: identity.source, report }, null, 2)}\n`,
+              'application/json',
+            );
+            toast('Full JSON downloaded — contains the seed');
+          },
+        }, ['Download full JSON']),
+        copyAction(
+          SECRET_FIELDS.map((field) => `${field}: ${String(report[field])}`).join('\n'),
+          'all secret fields',
+          'copy secrets',
+        ),
+        el('button', {
+          type: 'button',
+          class: 'btn ghost',
+          onclick: () => {
+            clearIdentity();
+            toast('Identity wiped from memory');
+            ctx.go('derive');
+          },
+        }, ['Wipe and go to Derive']),
+      ]),
+      hint(
+        'The full export contains the raw seed and every secret. Public JSON keeps the fingerprint, npub, and addresses only.',
+      ),
+    ]);
+
+    root.replaceChildren(secrets, publicCard, exportCard);
+  };
+
+  subscribe(render);
+  return root;
+}

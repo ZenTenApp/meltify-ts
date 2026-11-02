@@ -8,8 +8,9 @@ deterministic identity report: the raw seed, a 24-word MELT phrase, Nostr keys, 
 fingerprint/public key, 30 chain addresses, and the Beldex BChat chat ID.
 
 This package is the **isomorphic core plus its test suite**, with a small browser demo
-harness under `examples/browser-demo/`. There is no CLI yet (a deliberate later milestone).
-The core has no Node built-ins: it runs in Node or a browser bundle.
+harness under `examples/browser-demo/` and the production front end under `site/`.
+There is no CLI yet (a deliberate later milestone). The core has no Node built-ins: it
+runs in Node or a browser bundle.
 
 > **Secret material.** The report contains the raw private seed. Treat its output as a
 > secret; do not log it or send it anywhere.
@@ -100,6 +101,9 @@ src/core/                 isomorphic (no Node built-ins)
 src/render/text.ts        terminal renderer (plain + ANSI)
 test/                     vitest suites, golden vectors, ssh-keygen fixtures
 examples/browser-demo/    click-through demo page (esbuild bundle + node:http server)
+site/                     production front end → static artifact in site/dist/
+  src/worker/entry.ts     unlock + derive in a module worker
+  public/.htaccess        CSP and caching for cPanel/Apache deploys
 ```
 
 Only audited, zero-dependency primitives are used: `@noble/hashes`, `@noble/curves`,
@@ -114,6 +118,8 @@ npm run check:core# bundle src/index.ts with platform=neutral (proves no Node im
 npm run build     # emit dist/ + .d.ts
 npm run verify    # all of the above
 npm run demo      # build + serve the browser demo on http://localhost:5173
+npm run site:dev  # build + serve the production site on http://localhost:5174
+npm run site:build# static artifact in site/dist/ (what you upload to a host)
 ```
 
 ### Browser demo
@@ -128,6 +134,13 @@ report, plus a self-check panel that compares against the pinned Go vectors. See
 [`examples/browser-demo/README.md`](./examples/browser-demo/README.md) for the walkthrough.
 The demo bundles with `--platform=browser`, which is the practical proof that nothing in
 the core reaches for Node.
+
+### Site
+
+`site/` is the deployable front end: static files, no server, `site/dist/` is the
+artifact. See [`site/README.md`](./site/README.md) for the tab-by-tab feature map,
+the worker/secret-handling design, and the cPanel deployment steps (the CSP ships
+as `site/public/.htaccess`).
 
 ## Notes and intentional deviations
 

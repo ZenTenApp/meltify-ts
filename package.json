@@ -13,10 +13,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.build.json",
     "check:core": "esbuild src/index.ts --bundle --platform=neutral --format=esm --outfile=dist/core-neutral-check.mjs --log-level=warning",
-    "verify": "npm run typecheck && npm run demo:typecheck && npm run test && npm run check:core && npm run build",
+    "verify": "npm run typecheck && npm run demo:typecheck && npm run site:typecheck && npm run test && npm run check:core && npm run build",
     "demo": "node examples/browser-demo/dev.mjs",
     "demo:build": "esbuild examples/browser-demo/app.ts --bundle --platform=browser --format=esm --outfile=examples/browser-demo/app.js --sourcemap --log-level=warning",
-    "demo:typecheck": "tsc -p examples/browser-demo/tsconfig.json"
+    "demo:typecheck": "tsc -p examples/browser-demo/tsconfig.json",
+    "site:dev": "node site/serve.mjs --build --dev",
+    "site:build": "node site/build.mjs",
+    "site:serve": "node site/serve.mjs",
+    "site:typecheck": "tsc -p site/tsconfig.json"
   },
   "dependencies": {
     "@noble/ciphers": "^2.4.0",
