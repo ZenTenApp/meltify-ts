@@ -70,10 +70,35 @@ npm ci
 npm run site:build
 ```
 
-Upload the contents of `site/dist/` (including the dotfile `.htaccess`) to
-`public_html/`. Then check:
+Upload the contents of `site/dist/` (including the dotfile `.htaccess`) into a
+subdirectory of an existing cPanel application's document root — for example
+`public_html/meltify/`, served at `https://your-domain/meltify/`. Do not upload
+into the document root itself: the `.htaccess` here sets a site-wide CSP and
+year-long `immutable` caching for every `.js`/`.css` beneath it, which would
+break whatever else lives there.
 
-1. `https://your-domain/` loads, and the badge says "offline by policy".
+The links in `index.html` are relative and routing is hash-only, so no build
+change is needed for the subdirectory and no rewrite rules are involved.
+
+### From GitHub Actions
+
+`.github/workflows/deploy.yml` builds, gates, and syncs `site/dist/` over FTPS.
+Prerequisites, all outside the repo:
+
+- An FTP user whose home directory (chroot) can see `public_html/` — the main
+  cPanel account, or an FTP account with its directory set to `public_html`.
+- Repository secrets `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD`.
+- Optional repository variable `SITE_URL` (absolute URL of the deployed
+  directory). When set, a post-deploy smoke test fetches the page and asserts
+  the CSP header is present.
+
+The workflow's `SERVER_DIR` is allowlisted to exactly that one subdirectory and
+the upload uses `dangerous-clean-slate`, so that directory must belong to this
+site alone.
+
+Then check:
+
+1. `https://your-domain/meltify/` loads, and the badge says "offline by policy".
 2. DevTools → Network shows exactly two requests after load (no third parties).
 3. Response headers include the `Content-Security-Policy` from `.htaccess`.
    cPanel needs `mod_headers` enabled (it is on standard cPanel/Apache builds).

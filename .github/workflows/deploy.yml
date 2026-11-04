@@ -1,0 +1,94 @@
+name: Deploy to cPanel
+run-name: Deploy meltify site from ${{ github.ref }}
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two deploys race over the same directory.
+concurrency:
+  group: deploy-meltify-site
+  cancel-in-progress: true
+
+env:
+  # A subdirectory of an existing cPanel application's document root — NOT the
+  # document root itself. The directory belongs to this site alone, which is
+  # what makes `dangerous-clean-slate` safe: it can only ever empty our files.
+  #
+  # The path is relative to the FTP account's home directory (its chroot), so
+  # the account must be able to see public_html/: use the main cPanel account,
+  # or an FTP account whose directory is `public_html`.
+  SERVER_DIR: ./public_html/meltify/
+
+  # Absolute URL of the deployed directory (e.g. https://example.com/meltify/).
+  # Set the repository variable SITE_URL — Settings → Secrets and variables →
+  # Actions → Variables — to enable the post-deploy smoke test. While it is
+  # unset, that step is skipped.
+  SITE_URL: ${{ vars.SITE_URL }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Cheap gates: a type error or a drifted golden vector should not deploy.
+      - run: npm run site:typecheck
+      - run: npm test
+
+      # Builds the site into site/dist/ — NOT `npm run build`, which compiles
+      # the library to dist/ and has nothing to do with the deployable page.
+      - run: npm run site:build
+
+      - name: Verify artifact
+        run: |
+          set -euo pipefail
+          test -f site/dist/index.html || { echo 'missing site/dist/index.html'; exit 1; }
+          test -f site/dist/.htaccess || { echo 'missing site/dist/.htaccess'; exit 1; }
+          for asset in $(grep -o 'assets/[^"]*' site/dist/index.html | sort -u); do
+            test -f "site/dist/$asset" || { echo "missing $asset"; exit 1; }
+          done
+          if find site/dist -name '*.ts' -o -name 'tsconfig.json' | grep -q .; then
+            echo 'source files leaked into the artifact'; exit 1
+          fi
+          du -sh site/dist
+
+      # Exact-match allowlist: a typo can never reach the host application's
+      # own document root, where clean-slate would delete it.
+      - name: Refuse a shared document root
+        run: |
+          set -euo pipefail
+          case "$SERVER_DIR" in
+            ./public_html/meltify/) ;;
+            *) echo "SERVER_DIR is not the meltify subdirectory: $SERVER_DIR"; exit 1 ;;
+          esac
+
+      - name: Deploy to cPanel via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./site/dist/
+          server-dir: ${{ env.SERVER_DIR }}
+          dangerous-clean-slate: true
+          log-level: standard
+
+      # A partial upload still reports success, so check the live page.
+      - name: Smoke test
+        if: vars.SITE_URL != ''
+        run: |
+          set -euo pipefail
+          curl -fsS "$SITE_URL" | grep -q '<title>'
+          curl -fsSI "$SITE_URL" | grep -qi 'content-security-policy'
