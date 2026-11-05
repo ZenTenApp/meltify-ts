@@ -127,9 +127,7 @@ jobs:
       - name: Configure SSH
         if: steps.dry.outputs.new_release_published == 'true'
         env:
-          # Organization secret, shared with this repo; the step keeps the
-          # internal name so the ssh setup below is unchanged.
-          DEPLOY_SSH_KEY: ${{ secrets.NOSTRBOX_DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
