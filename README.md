@@ -144,7 +144,7 @@ as `site/public/.htaccess`).
 
 ### Releasing
 
-`main` releases itself. `.github/workflows/release.yml` analyses Conventional
+`master` releases itself. `.github/workflows/release.yml` analyses Conventional
 Commit types (`feat` → minor, `fix` → patch, breaking → major) and does nothing
 at all for a `docs`/`chore`-only push. When a release is due it builds
 `site/dist/`, syncs it to `https://nostr.box/meltify/` over SFTP, verifies the

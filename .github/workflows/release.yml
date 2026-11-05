@@ -1,7 +1,7 @@
 name: Release and deploy meltify
 run-name: Release meltify from ${{ github.ref }}
 
-# Semantic-release pipeline, same shape as NostrBox Kinds: every push to main is
+# Semantic-release pipeline, same shape as NostrBox Kinds: every push to master is
 # analysed for Conventional Commit types, and only a feat/fix/breaking commit
 # cuts a release. A docs/chore-only push stops after the dry run. When a release
 # is due, the static bundle is built, gated, synced to the cPanel account over
@@ -16,12 +16,14 @@ run-name: Release meltify from ${{ github.ref }}
 on:
   push:
     branches:
-      - main
+      # This repo's default branch is master. release.config.cjs must name the
+      # same branch, or semantic-release refuses to run on it.
+      - master
   workflow_dispatch:
 
 # A newer push supersedes an in-flight run. cancel-in-progress is load-bearing:
 # without it, pushing again mid-build leaves the older run's checkout behind
-# remote main, and semantic-release aborts with "branch is behind", publishing
+# remote master, and semantic-release aborts with "branch is behind", publishing
 # nothing. Cancelling also stops an older bundle landing after a newer one.
 concurrency:
   group: release-${{ github.ref }}
@@ -43,7 +45,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     # contents: write → semantic-release pushes the release commit + tag back to
-    # main (required even by the dry run's push-access check).
+    # master (required even by the dry run's push-access check).
     # issues/pull-requests: write → semantic-release's GitHub plugin.
     permissions:
       contents: write
@@ -262,7 +264,7 @@ jobs:
         run: tar -czf "meltify-v${{ steps.dry.outputs.new_release_version }}.tar.gz" -C site/dist .
 
       # The real run: bumps package.json, writes CHANGELOG.md, commits both to
-      # main with `[skip ci]`, tags vX.Y.Z, and publishes the GitHub Release with
+      # master with `[skip ci]`, tags vX.Y.Z, and publishes the GitHub Release with
       # generated notes + the tarball. Same version the dry run computed (no new
       # commits land between them within this job).
       - name: Publish release (semantic-release)
