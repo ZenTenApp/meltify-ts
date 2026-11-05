@@ -13,7 +13,7 @@
  * missing there fails config load.
  */
 module.exports = {
-  branches: ['main'],
+  branches: ['master'],
   tagFormat: 'v${version}',
   plugins: [
     '@semantic-release/commit-analyzer',

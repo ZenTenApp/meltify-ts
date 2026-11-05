@@ -94,7 +94,7 @@ otherwise answer the bare form with 404).
 `.github/workflows/release.yml` runs a semantic-release pipeline, in the same
 shape as NostrBox Kinds: Conventional Commit types decide whether a release is
 due, and the bundle is built, gated, synced to the server, and verified live
-**before** the tag is published. A `docs`/`chore`-only push to `main` stops
+**before** the tag is published. A `docs`/`chore`-only push to `master` stops
 after the dry run and deploys nothing.
 
 The transport is SFTP, not FTP. The cPanel account has SSH keys but no shell,
