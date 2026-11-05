@@ -243,9 +243,9 @@ export function mountDerive(ctx: Ctx): HTMLElement {
         el('span', { class: 'label' }, ['subaccount label']),
         subaccount,
       ]),
-      hint(
+      el('p', { class: 'hint tight', style: 'margin-bottom: 14px' }, [
         'A subaccount label derives a different deterministic key from the same source key: the seed becomes SHA256(SHA256(utf8(label)) ‖ seed), and the re-encoded key reuses this passphrase at bcrypt rounds 1. Leave it empty to derive the source identity.',
-      ),
+      ]),
       el('div', { class: 'row' }, [
         deriveButton,
         throwawayButton,
