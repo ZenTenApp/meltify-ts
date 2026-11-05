@@ -9,6 +9,10 @@ export interface Identity {
   elapsedMs: number;
   /** Where it came from, for the status line. */
   source: string;
+  /** Subaccount label the report was derived for; '' when it is the source key. */
+  subaccount: string;
+  /** Re-encoded subaccount PEM (same passphrase, bcrypt rounds 1); absent for the source key. */
+  subaccountPem?: string;
   derivedAt: number;
 }
 

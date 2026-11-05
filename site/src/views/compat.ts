@@ -61,6 +61,9 @@ export function mountCompat(_ctx: Ctx): HTMLElement {
           pill(`${lines} lines`),
           pill('plain = parity target'),
           pill('colour: meltify-info palette'),
+          ...(identity.subaccount === ''
+            ? []
+            : [pill(`subaccount: ${identity.subaccount}`, 'ok')]),
         ]),
       ]),
     );

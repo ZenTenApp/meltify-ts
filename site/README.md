@@ -39,8 +39,8 @@ and `.htaccess`.
 
 | Tab | Feature |
 | --- | --- |
-| Derive | File drop or paste, passphrase, throwaway key (pinned seed `00..1f` or random) |
-| Report | Secret + public blocks, per-field reveal, public/full JSON export, wipe |
+| Derive | File drop or paste, passphrase, optional subaccount label, throwaway key (pinned seed `00..1f` or random) |
+| Report | Secret + public blocks, per-field reveal, public/full JSON export, subaccount key download, wipe |
 | Chains | 30 labeled addresses grouped by family, filter, CSV export |
 | meltify-info | `renderText` output in meltify-info's own colours, `.txt` download (plain form is the parity target) |
 | Phrase lab | seed → MELT/CryptoNote phrase, phrase → BIP39 seed, 25-word phrase → Monero/Beldex/BChat |
@@ -58,6 +58,14 @@ and `.htaccess`.
 - **Masking is cosmetic and per field.** Seed, phrase, nsec, and the private-key
   body each carry their own reveal button on the Report tab, but they are plain
   strings in memory — same caveat as the terminal tool.
+- **Subaccounts are a label on Derive, not a tab.** Filling in the subaccount
+  label derives the child identity in the same worker call and re-encodes the key
+  with the same passphrase at bcrypt rounds 1, exactly like `meltify-info
+  --subaccount`. Every other tab then shows the subaccount's identity, the
+  Report footer names the label, and the Report export offers the re-encoded
+  subaccount key. An empty label is the source key. The label itself is not
+  secret, and it is the only thing that has to be remembered to get the
+  subaccount back.
 - **Colour means secrecy.** A `valueBlock` marked `secret` paints red, matching
   the binary's private-value colour; anything unmasked is green. The
   meltify-info tab reuses `renderText({ color: true })` and converts its SGR

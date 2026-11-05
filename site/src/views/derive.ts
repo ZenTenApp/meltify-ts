@@ -40,6 +40,13 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     placeholder: 'key passphrase',
     id: 'passphrase',
   });
+  const subaccount = el('input', {
+    type: 'text',
+    autocomplete: 'off',
+    spellcheck: 'false',
+    id: 'subaccount',
+    placeholder: 'optional — e.g. work',
+  });
   const revealPass = el('button', { type: 'button', class: 'btn ghost small' }, ['show']);
   const deriveButton = el('button', { type: 'button', class: 'btn primary' }, ['Derive identity']);
   const throwawayButton = el('button', { type: 'button', class: 'btn' }, ['Try a throwaway key']);
@@ -130,15 +137,17 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     deriveButton.disabled = true;
     deriveButton.textContent = 'Deriving…';
     try {
-      const result = await deriveFromKey(pem, passphrase.value);
+      const result = await deriveFromKey(pem, passphrase.value, subaccount.value.trim());
       setIdentity({
         report: result.report,
         seedHex: result.seedHex,
         elapsedMs: result.elapsedMs,
         source: sourceLabel.textContent === '' ? 'pasted key' : sourceLabel.textContent,
+        subaccount: result.subaccount,
+        ...(result.pem === undefined ? {} : { subaccountPem: result.pem }),
         derivedAt: Date.now(),
       });
-      toast('Identity derived');
+      toast(result.subaccount === '' ? 'Identity derived' : `Subaccount “${result.subaccount}” derived`);
       ctx.go('report');
     } catch (error) {
       clearIdentity();
@@ -160,7 +169,7 @@ export function mountDerive(ctx: Ctx): HTMLElement {
         crypto.getRandomValues(seed);
         seedHex = toHex(seed);
       }
-      const result = await deriveThrowaway(seedHex, THROWAWAY_PASSPHRASE);
+      const result = await deriveThrowaway(seedHex, THROWAWAY_PASSPHRASE, subaccount.value.trim());
       keyText.value = result.pem;
       passphrase.value = THROWAWAY_PASSPHRASE;
       sourceLabel.textContent = pinGolden.checked ? 'throwaway key (seed 00..1f)' : 'throwaway key (random)';
@@ -169,6 +178,8 @@ export function mountDerive(ctx: Ctx): HTMLElement {
         seedHex: result.seedHex,
         elapsedMs: result.elapsedMs,
         source: sourceLabel.textContent,
+        subaccount: result.subaccount,
+        ...(result.subaccount === '' ? {} : { subaccountPem: result.pem }),
         derivedAt: Date.now(),
       });
       toast('Throwaway key derived');
@@ -205,6 +216,7 @@ export function mountDerive(ctx: Ctx): HTMLElement {
   window.addEventListener('meltify:wipe', () => {
     keyText.value = '';
     passphrase.value = '';
+    subaccount.value = '';
     sourceLabel.textContent = '';
     clearNotice();
   });
@@ -227,6 +239,13 @@ export function mountDerive(ctx: Ctx): HTMLElement {
         el('span', { class: 'label' }, ['passphrase']),
         el('div', { class: 'row tight' }, [passphrase, revealPass]),
       ]),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'label' }, ['subaccount label']),
+        subaccount,
+      ]),
+      el('p', { class: 'hint tight', style: 'margin-bottom: 14px' }, [
+        'A subaccount label derives a different deterministic key from the same source key: the seed becomes SHA256(SHA256(utf8(label)) ‖ seed), and the re-encoded key reuses this passphrase at bcrypt rounds 1. Leave it empty to derive the source identity.',
+      ]),
       el('div', { class: 'row' }, [
         deriveButton,
         throwawayButton,
@@ -244,7 +263,9 @@ export function mountDerive(ctx: Ctx): HTMLElement {
           type: 'button',
           class: 'btn ghost small',
           onclick: () => {
-            void copyText('NO_COLOR=1 meltify-info --key /path/to/id_ed25519').then(
+            const label = subaccount.value.trim();
+            const flag = label === '' ? '' : ` --subaccount ${JSON.stringify(label)}`;
+            void copyText(`NO_COLOR=1 meltify-info --key /path/to/id_ed25519${flag}`).then(
               () => toast('Copied'),
               () => toast('Copy failed', true),
             );
