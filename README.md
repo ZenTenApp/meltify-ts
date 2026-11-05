@@ -142,6 +142,16 @@ artifact. See [`site/README.md`](./site/README.md) for the tab-by-tab feature ma
 the worker/secret-handling design, and the cPanel deployment steps (the CSP ships
 as `site/public/.htaccess`).
 
+### Releasing
+
+`main` releases itself. `.github/workflows/release.yml` analyses Conventional
+Commit types (`feat` → minor, `fix` → patch, breaking → major) and does nothing
+at all for a `docs`/`chore`-only push. When a release is due it builds
+`site/dist/`, syncs it to `https://nostr.box/meltify/` over SFTP, verifies the
+live page, and only then tags `vX.Y.Z` and publishes the GitHub Release with the
+bundle tarball attached. `CHANGELOG.md` and the version in `package.json` are
+written by semantic-release, so do not edit either by hand.
+
 ## Notes and intentional deviations
 
 - **Color output** approximates meltify's truecolor palette; ANSI byte-parity is not

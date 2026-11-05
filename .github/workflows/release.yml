@@ -1,0 +1,295 @@
+name: Release and deploy meltify
+run-name: Release meltify from ${{ github.ref }}
+
+# Semantic-release pipeline, same shape as NostrBox Kinds: every push to main is
+# analysed for Conventional Commit types, and only a feat/fix/breaking commit
+# cuts a release. A docs/chore-only push stops after the dry run. When a release
+# is due, the static bundle is built, gated, synced to the cPanel account over
+# SFTP, verified live, and only then tagged — so a release never points at a
+# deploy that failed.
+#
+# Single job on purpose: semantic-release CORE verifies branch push access even
+# in `--dry-run`, so the token needs `contents: write` just to compute the next
+# version. A "read-only version gate" job is impossible, so the write-capable
+# semantic-release runs exactly once here and the build/deploy steps are skipped
+# in-line when no release is due.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# A newer push supersedes an in-flight run. cancel-in-progress is load-bearing:
+# without it, pushing again mid-build leaves the older run's checkout behind
+# remote main, and semantic-release aborts with "branch is behind", publishing
+# nothing. Cancelling also stops an older bundle landing after a newer one.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Where the bundle lands, relative to the deploy user's home directory. This
+  # is a subdirectory of nostr.box's document root, NOT that document root: the
+  # site is served at https://nostr.box/meltify/.
+  #
+  # Validated against this exact string in "Refuse a shared document root" —
+  # see the comment there before changing it.
+  EXPECTED_DEPLOY_PATH: public_html/meltify
+
+  # The live URL, used by the post-deploy verification step.
+  SITE_URL: https://nostr.box/meltify/
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # contents: write → semantic-release pushes the release commit + tag back to
+    # main (required even by the dry run's push-access check).
+    # issues/pull-requests: write → semantic-release's GitHub plugin.
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full history + tags for commit-analyzer; the token persists so
+          # semantic-release's git plugin can push the release commit + tag.
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Cheap gates: a type error or a drifted golden vector should not deploy.
+      - name: Typecheck site
+        run: npm run site:typecheck
+
+      - name: Test
+        run: npm test
+
+      # Dry run: compute the next version from Conventional Commits without
+      # tagging, committing, or publishing. `new_release_published` is 'true'
+      # only when a releasable commit exists since the last tag — every build /
+      # deploy / publish step below is gated on it, so a docs push stops here.
+      - name: Compute next version (dry run)
+        id: dry
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          dry_run: true
+          # MUST match the Publish step's extra_plugins below — both load the
+          # same release.config.cjs, so a plugin missing here fails config load.
+          # (GitHub Actions ignores YAML anchors, so the list is duplicated by
+          # necessity; keep the two in lockstep.)
+          extra_plugins: |
+            @semantic-release/changelog@6
+            @semantic-release/git@10
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # From here down every step repeats `if: …new_release_published == 'true'`.
+      # This is the accepted cost of the single-job design: grouping them under
+      # one `if` would need a dependent job, which reintroduces the stale-checkout
+      # "branch is behind → no publish" race. The repetition is deliberate.
+
+      # Builds the site into site/dist/ — NOT `npm run build`, which compiles the
+      # library to dist/ and has nothing to do with the deployable page.
+      - name: Build site
+        if: steps.dry.outputs.new_release_published == 'true'
+        run: npm run site:build
+
+      - name: Verify artifact
+        if: steps.dry.outputs.new_release_published == 'true'
+        run: |
+          set -euo pipefail
+          test -f site/dist/index.html || { echo '::error::missing site/dist/index.html'; exit 1; }
+          # The dotfile carries the CSP and the cache headers. lftp mirror copies
+          # dotfiles, but a missing one here would deploy a page with no policy.
+          test -f site/dist/.htaccess || { echo '::error::missing site/dist/.htaccess'; exit 1; }
+          for asset in $(grep -o 'assets/[^"]*' site/dist/index.html | sort -u); do
+            test -f "site/dist/$asset" || { echo "::error::missing $asset"; exit 1; }
+          done
+          if find site/dist -name '*.ts' -o -name 'tsconfig.json' | grep -q .; then
+            echo '::error::source files leaked into the artifact'; exit 1
+          fi
+          du -sh site/dist
+
+      # Host key comes from a secret, not ssh-keyscan: keyscan trusts whatever
+      # answers at deploy time, which is exactly the check being skipped.
+      # Generate the secret once with `ssh-keyscan nostr.box`.
+      - name: Configure SSH
+        if: steps.dry.outputs.new_release_published == 'true'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+          # A known_hosts entry is keyed by the exact host string, so a secret
+          # scanned for `nostr.box` does not match a DEPLOY_HOST of
+          # `www.nostr.box` or of the bare IP — same machine, same host key, no
+          # match. The connection reports that as a bare "Host key verification
+          # failed" two steps later, naming neither secret, so the three ways to
+          # get here are separated out and named.
+          if [ ! -s ~/.ssh/known_hosts ]; then
+            echo "::error::DEPLOY_KNOWN_HOSTS is empty or unset."
+            exit 1
+          fi
+          if grep -q '^|1|' ~/.ssh/known_hosts; then
+            echo "::error::DEPLOY_KNOWN_HOSTS holds hashed entries — they only" \
+                 "match the host they were hashed for, so a copy of a local" \
+                 "~/.ssh/known_hosts is unusable here. Regenerate with:" \
+                 "ssh-keyscan $DEPLOY_HOST"
+            exit 1
+          fi
+          if ! ssh-keygen -F "$DEPLOY_HOST" -f ~/.ssh/known_hosts > /dev/null; then
+            echo "::error::DEPLOY_KNOWN_HOSTS ($(wc -l < ~/.ssh/known_hosts) entries)" \
+                 "names no host matching DEPLOY_HOST. The two secrets have to" \
+                 "agree on how the host is spelled. Regenerate with:" \
+                 "ssh-keyscan $DEPLOY_HOST"
+            exit 1
+          fi
+
+      # --delete makes DEPLOY_PATH this app's alone. It sits *inside* another
+      # site's document root, and one level above it is nostr.box itself, so the
+      # path is validated against one exact value: a typo, a dropped trailing
+      # component, an absolute path, or a `/`-suffixed variant with extra
+      # segments would otherwise turn a deploy into a deletion of the host site.
+      #
+      # This is the guard, not a lint: it runs after the secrets are available
+      # and before lftp is allowed to connect.
+      - name: Refuse a shared document root
+        if: steps.dry.outputs.new_release_published == 'true'
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_PATH:-}" ]; then
+            echo "::error::DEPLOY_PATH is empty or unset."
+            exit 1
+          fi
+          case "$DEPLOY_PATH" in
+            "$EXPECTED_DEPLOY_PATH"|"$EXPECTED_DEPLOY_PATH/") ;;
+            *)
+              echo "::error::DEPLOY_PATH is '${DEPLOY_PATH}', which is not the meltify subdirectory."
+              echo "::error::It must be exactly '${EXPECTED_DEPLOY_PATH}' (a trailing slash is tolerated)."
+              echo "::error::The deploy runs 'lftp mirror --delete', so that directory belongs to this site alone."
+              echo "::error::'public_html' would delete nostr.box; anything above it is not ours."
+              exit 1
+              ;;
+          esac
+          test -d site/dist || { echo "::error::site/dist is missing; the build did not run."; exit 1; }
+
+      # The account has SSH keys but no shell ("Shell access is not enabled on
+      # your account"), which rules rsync out entirely: rsync works by running
+      # its own binary on the far side. SFTP is enabled, and `lftp mirror` is the
+      # same directory sync — recursive, with --delete and excludes — over that
+      # protocol. lftp is not on the runner image, hence the install.
+      - name: Install lftp
+        if: steps.dry.outputs.new_release_published == 'true'
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      # Two passes, in this order, because a static site is briefly inconsistent
+      # while it uploads: pass one adds the new hashed assets without deleting
+      # anything, so the old index.html keeps resolving; pass two writes the new
+      # index.html and only then removes what the build dropped.
+      #
+      # --delete is scoped to DEPLOY_PATH, which the step above pins to the
+      # meltify subdirectory. The two excludes are cPanel's own directories:
+      # .well-known carries the ACME challenges that renew the TLS certificate,
+      # and cgi-bin comes with every docroot. Neither exists inside
+      # public_html/meltify/ today; they are kept so that moving the site up a
+      # level would not silently delete them.
+      #
+      # `open -u USER,` with the empty password is load-bearing: lftp otherwise
+      # prompts for one, fails to read a terminal in CI, and falls back to an
+      # anonymous login that cannot write ("Login failed: Password required").
+      # The key is handed to the ssh in connect-program, not to lftp.
+      #
+      # .DS_Store is excluded for a local run of the same command — CI never
+      # produces one, a Mac always does, and it would otherwise be published.
+      - name: Deploy to nostr.box/meltify
+        if: steps.dry.outputs.new_release_published == 'true'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          lftp -c "
+            set sftp:connect-program 'ssh -a -x -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts';
+            open -u $DEPLOY_USER, sftp://$DEPLOY_HOST;
+            mirror --reverse --verbose --parallel=4 \
+                   --exclude '^\.well-known/' --exclude '^cgi-bin/' \
+                   --exclude '(^|/)\.DS_Store$' --exclude '^index\.html$' \
+                   site/dist/ '$DEPLOY_PATH';
+            mirror --reverse --verbose --delete \
+                   --exclude '^\.well-known/' --exclude '^cgi-bin/' \
+                   --exclude '(^|/)\.DS_Store$' \
+                   site/dist/ '$DEPLOY_PATH';
+          "
+
+      # The deploy is only done when the server serves it. This site needs no
+      # rewrite rules (hash routing), so the checks are the shell, one hashed
+      # asset, and the .htaccess header — the last one is what proves the dotfile
+      # landed, since a missing policy does not break the page, it just leaves it
+      # unstyled and unguarded.
+      - name: Verify the live site
+        if: steps.dry.outputs.new_release_published == 'true'
+        run: |
+          set -euo pipefail
+          curl -sSf --retry 3 --retry-delay 5 "$SITE_URL" | grep -q '<title>meltify'
+          asset="$(curl -sSf "$SITE_URL" | grep -o 'assets/[^"]*' | head -1)"
+          test -n "$asset" || { echo '::error::no asset reference in the served page'; exit 1; }
+          curl -sSf "$SITE_URL$asset" > /dev/null
+          curl -sSfI "$SITE_URL" | grep -qi 'content-security-policy'
+
+      # Matches the `meltify-v*.tar.gz` glob in release.config.cjs, so the exact
+      # deployed tree is attached to the GitHub Release.
+      - name: Stage bundle tarball
+        if: steps.dry.outputs.new_release_published == 'true'
+        run: tar -czf "meltify-v${{ steps.dry.outputs.new_release_version }}.tar.gz" -C site/dist .
+
+      # The real run: bumps package.json, writes CHANGELOG.md, commits both to
+      # main with `[skip ci]`, tags vX.Y.Z, and publishes the GitHub Release with
+      # generated notes + the tarball. Same version the dry run computed (no new
+      # commits land between them within this job).
+      - name: Publish release (semantic-release)
+        if: steps.dry.outputs.new_release_published == 'true'
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          extra_plugins: |
+            @semantic-release/changelog@6
+            @semantic-release/git@10
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Only notify on an actual publish — never claim a release the dry run
+      # decided against.
+      - name: Send Matrix notification
+        if: steps.dry.outputs.new_release_published == 'true'
+        uses: s3krit/matrix-message-action@v0.0.3
+        with:
+          room_id: '!iwdKjDhZbfmbPcQDyI:ft.hn'
+          access_token: ${{ secrets.MATRIX_ACCESS_TOKEN }}
+          server: 'matrix.ft.hn'
+          message: |
+            **meltify v${{ steps.dry.outputs.new_release_version }} (build #${{ github.run_number }}) — Release**
+
+            Web app: [${{ env.SITE_URL }}](${{ env.SITE_URL }})
+            GitHub Release: [v${{ steps.dry.outputs.new_release_version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.dry.outputs.new_release_version }})
+
+            Version: `${{ steps.dry.outputs.new_release_version }}` | Build: `${{ github.run_number }}` | Platform: `web`
+
+            [View Build](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            Commit: `${{ github.sha }}`

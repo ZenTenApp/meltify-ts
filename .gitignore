@@ -6,3 +6,4 @@ examples/browser-demo/app.js
 examples/browser-demo/app.js.map
 site/dist/
 site/.build/
+meltify-v*.tar.gz

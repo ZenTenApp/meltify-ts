@@ -75,34 +75,50 @@ npm run site:build
 ```
 
 Upload the contents of `site/dist/` (including the dotfile `.htaccess`) into a
-subdirectory of an existing cPanel application's document root — for example
-`public_html/meltify/`, served at `https://your-domain/meltify/`. Do not upload
-into the document root itself: the `.htaccess` here sets a site-wide CSP and
-year-long `immutable` caching for every `.js`/`.css` beneath it, which would
-break whatever else lives there.
+subdirectory of an existing cPanel application's document root — here
+`public_html/meltify/` on `nostr.box`, served at `https://nostr.box/meltify/`.
+Do not upload into the document root itself: the `.htaccess` here sets a
+site-wide CSP and year-long `immutable` caching for every `.js`/`.css` beneath
+it, which would break whatever else lives there.
 
 The links in `index.html` are relative and routing is hash-only, so no build
 change is needed for the subdirectory and no rewrite rules are involved.
 
+The canonical URL ends in a slash: `https://nostr.box/meltify/`. Relative asset
+links only resolve correctly from there, so `/meltify` must 301 to it — which is
+what `DirectorySlash On` in `.htaccess` restores on hosts that disable it (they
+otherwise answer the bare form with 404).
+
 ### From GitHub Actions
 
-`.github/workflows/deploy.yml` builds, gates, and syncs `site/dist/` over FTPS.
+`.github/workflows/release.yml` runs a semantic-release pipeline, in the same
+shape as NostrBox Kinds: Conventional Commit types decide whether a release is
+due, and the bundle is built, gated, synced to the server, and verified live
+**before** the tag is published. A `docs`/`chore`-only push to `main` stops
+after the dry run and deploys nothing.
+
+The transport is SFTP, not FTP. The cPanel account has SSH keys but no shell,
+which rules out rsync (`rsync` needs to run its own binary on the far side), so
+`lftp mirror` does the directory sync over SFTP: recursive, with `--delete` and
+the `.well-known`/`cgi-bin` excludes. Two passes on purpose — new hashed assets
+land first, the new `index.html` and the deletions last, so the page is never
+briefly pointing at assets that are not there yet.
+
 Prerequisites, all outside the repo:
 
-- An FTP user whose home directory (chroot) can see `public_html/` — the main
-  cPanel account, or an FTP account with its directory set to `public_html`.
-- Repository secrets `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD`.
-- Optional repository variable `SITE_URL` (absolute URL of the deployed
-  directory). When set, a post-deploy smoke test fetches the page and asserts
-  the CSP header is present.
-
-The workflow's `SERVER_DIR` is allowlisted to exactly that one subdirectory and
-the upload uses `dangerous-clean-slate`, so that directory must belong to this
-site alone.
+- A deploy account with SFTP access to `public_html/` on `nostr.box`.
+- Repository secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`,
+  `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` (and `MATRIX_ACCESS_TOKEN` for the
+  notification). `DEPLOY_KNOWN_HOSTS` must be generated with
+  `ssh-keyscan $DEPLOY_HOST` — an entry is keyed by the exact host string, and
+  hashed entries from a local `~/.ssh/known_hosts` will not match.
+- `DEPLOY_PATH` must be exactly `public_html/meltify`. The workflow refuses any
+  other value: `--delete` makes that directory this site's alone, and
+  `public_html` would delete `nostr.box` itself.
 
 Then check:
 
-1. `https://your-domain/meltify/` loads, and the badge says "offline by policy".
+1. `https://nostr.box/meltify/` loads, and the badge says "offline by policy".
 2. DevTools → Network shows exactly two requests after load (no third parties).
 3. Response headers include the `Content-Security-Policy` from `.htaccess`.
    cPanel needs `mod_headers` enabled (it is on standard cPanel/Apache builds).
