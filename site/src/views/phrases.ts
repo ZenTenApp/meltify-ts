@@ -47,9 +47,12 @@ function seedPanel(): Panel {
     const mnemonic = mnemonic24FromSeed(seed);
     const reduced = scReduce32(seed);
     output.replaceChildren(
-      valueBlock('melt phrase', mnemonic, { note: '24 words, BIP39' }),
-      valueBlock('sc-reduced seed', toHex(reduced), { note: 'hex, fed to CryptoNote' }),
-      valueBlock('cryptonote phrase', encodeLegacyMnemonic(reduced), { note: '25 words' }),
+      valueBlock('melt phrase', mnemonic, { secret: true, note: '24 words, BIP39' }),
+      valueBlock('sc-reduced seed', toHex(reduced), { secret: true, note: 'hex, fed to CryptoNote' }),
+      valueBlock('cryptonote phrase', encodeLegacyMnemonic(reduced), {
+        secret: true,
+        note: '25 words',
+      }),
     );
   };
 
@@ -123,7 +126,10 @@ function legacyPanel(): Panel {
         valueBlock('monero primary', moneroAddressFromLegacy(phrase)),
         valueBlock('beldex primary', beldexAddressFromLegacy(phrase)),
         valueBlock('bchat chat id', bchatChatId(reduced)),
-        valueBlock('re-encoded phrase', encodeLegacyMnemonic(reduced), { note: 'round-trip check' }),
+        valueBlock('re-encoded phrase', encodeLegacyMnemonic(reduced), {
+          secret: true,
+          note: 'round-trip check',
+        }),
       );
     } catch (error) {
       output.replaceChildren(

@@ -1,9 +1,11 @@
 /**
- * Compat view: the exact text meltify-info prints, with and without ANSI color.
- * Plain output is the byte-parity target for the Go binary.
+ * Compat view: the exact text meltify-info prints, coloured with the binary's
+ * own palette. The copy button and the .txt download stay plain — that form is
+ * the byte-parity target for the Go binary.
  */
 
 import { renderText } from 'meltify-ts';
+import { ansiToNodes } from '../lib/ansi.ts';
 import { copyAction } from '../lib/blocks.ts';
 import { downloadText } from '../lib/download.ts';
 import { el, hint, pill } from '../lib/dom.ts';
@@ -12,7 +14,6 @@ import type { Ctx } from '../app-types.ts';
 
 export function mountCompat(_ctx: Ctx): HTMLElement {
   const root = el('div', { class: 'view' });
-  let color = false;
 
   const render = (state: AppState): void => {
     const identity = state.identity;
@@ -33,21 +34,13 @@ export function mountCompat(_ctx: Ctx): HTMLElement {
 
     const report = identity.report;
     const plain = renderText(report, { color: false });
-    const text = color ? renderText(report, { color: true }) : plain;
     const lines = plain.split('\n').length;
-
-    const colorToggle = el('input', { type: 'checkbox', checked: color });
-    colorToggle.addEventListener('change', () => {
-      color = colorToggle.checked;
-      render(state);
-    });
 
     root.replaceChildren(
       el('section', { class: 'card' }, [
         el('div', { class: 'row', style: 'justify-content: space-between' }, [
           el('h2', { style: 'margin: 0' }, ['meltify-info output']),
           el('div', { class: 'row tight' }, [
-            el('label', { class: 'switch' }, [colorToggle, el('span', {}, ['ANSI color'])]),
             copyAction(plain, 'plain meltify-info output'),
             el('button', {
               type: 'button',
@@ -59,13 +52,15 @@ export function mountCompat(_ctx: Ctx): HTMLElement {
           ]),
         ]),
         hint(
-          'This is what meltify-info prints. With NO_COLOR=1 (or a non-TTY) the Go binary emits the plain form, which is byte-identical to the copy button above.',
+          'Colours are the ones meltify-info paints on a TTY: borders in bold white, public values green, secret values red. Copy and download stay plain because that form — what the binary emits with NO_COLOR=1 or a non-TTY — is the byte-parity target.',
         ),
-        el('div', { style: 'margin-top: 12px' }, [el('pre', { class: 'textout' }, [text])]),
+        el('div', { style: 'margin-top: 12px' }, [
+          el('pre', { class: 'textout' }, ansiToNodes(renderText(report, { color: true }))),
+        ]),
         el('div', { class: 'pills' }, [
           pill(`${lines} lines`),
           pill('plain = parity target'),
-          pill(color ? 'color: on (approximate palette)' : 'color: off'),
+          pill('colour: meltify-info palette'),
         ]),
       ]),
     );

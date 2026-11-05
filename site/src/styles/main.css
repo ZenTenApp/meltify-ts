@@ -401,8 +401,10 @@ a:focus-visible {
 .block.secret pre {
   color: var(--secret);
 }
-.block.secret.revealed pre {
-  color: #ffc2bd;
+/* Masked values read as placeholders, not as content. */
+.block pre.masked {
+  color: var(--muted);
+  letter-spacing: 0.12em;
 }
 .block .actions {
   display: flex;

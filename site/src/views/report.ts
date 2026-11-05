@@ -45,8 +45,6 @@ function footer(identity: Identity): HTMLElement {
 
 export function mountReport(ctx: Ctx): HTMLElement {
   const root = el('div', { class: 'view' });
-  let revealed = false;
-  let latest: Identity | null = null;
 
   const emptyState = (): HTMLElement =>
     el('section', { class: 'card' }, [
@@ -60,7 +58,6 @@ export function mountReport(ctx: Ctx): HTMLElement {
     ]);
 
   const render = (state: AppState): void => {
-    latest = state.identity;
     const identity = state.identity;
     if (identity === null) {
       root.replaceChildren(emptyState());
@@ -68,35 +65,24 @@ export function mountReport(ctx: Ctx): HTMLElement {
     }
     const report = identity.report;
 
-    const revealSwitch = el('input', { type: 'checkbox', checked: revealed });
-    revealSwitch.addEventListener('change', () => {
-      revealed = revealSwitch.checked;
-      render({ identity: latest });
-    });
-
     const secrets = el('section', { class: 'card' }, [
-      el('div', { class: 'row', style: 'justify-content: space-between' }, [
-        el('h2', { style: 'margin: 0' }, ['Secret material']),
-        el('label', { class: 'switch' }, [revealSwitch, el('span', {}, ['reveal secrets'])]),
-      ]),
+      el('h2', {}, ['Secret material']),
       hint(
-        'Masking is cosmetic — the values live unencrypted in this tab’s memory for as long as the report is loaded.',
+        'Each field is masked until you reveal it. Masking is cosmetic — the values live unencrypted in this tab’s memory for as long as the report is loaded.',
       ),
       el('div', { class: 'blocks', style: 'margin-top: 14px' }, [
         valueBlock('private key body', report.privateKeyBlock, {
-          secret: true,
-          revealed,
+          masked: true,
           note: 'base64 of openssh-key-v1',
         }),
-        valueBlock('ed25519 seed', report.seedHex, { secret: true, revealed, note: 'hex, 32 bytes' }),
-        valueBlock('melt phrase', report.mnemonic24, { secret: true, revealed, note: '24 words' }),
+        valueBlock('ed25519 seed', report.seedHex, { masked: true, note: 'hex, 32 bytes' }),
+        valueBlock('melt phrase', report.mnemonic24, { masked: true, note: '24 words' }),
         valueBlock('cryptonote phrase', report.legacyPhrase, {
-          secret: true,
-          revealed,
+          masked: true,
           note: '25 words, not printed by meltify-info',
         }),
-        valueBlock('nostr secret', report.nsec, { secret: true, revealed, note: 'nsec' }),
-        valueBlock('nostr private key', report.privKeyHex, { secret: true, revealed, note: 'hex' }),
+        valueBlock('nostr secret', report.nsec, { masked: true, note: 'nsec' }),
+        valueBlock('nostr private key', report.privKeyHex, { masked: true, note: 'hex' }),
       ]),
     ]);
 

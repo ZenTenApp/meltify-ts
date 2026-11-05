@@ -40,9 +40,9 @@ and `.htaccess`.
 | Tab | Feature |
 | --- | --- |
 | Derive | File drop or paste, passphrase, throwaway key (pinned seed `00..1f` or random) |
-| Report | Secret + public blocks, reveal toggle, public/full JSON export, wipe |
+| Report | Secret + public blocks, per-field reveal, public/full JSON export, wipe |
 | Chains | 30 labeled addresses grouped by family, filter, CSV export |
-| meltify-info | `renderText` output, ANSI toggle, `.txt` download (plain form is the parity target) |
+| meltify-info | `renderText` output in meltify-info's own colours, `.txt` download (plain form is the parity target) |
 | Phrase lab | seed → MELT/CryptoNote phrase, phrase → BIP39 seed, 25-word phrase → Monero/Beldex/BChat |
 | Key tools | Marshal a new password-protected key (rounds 1 or 16) and hand it to Derive |
 | Self-check | Re-runs the pinned Go vectors against the loaded bundle |
@@ -55,9 +55,13 @@ and `.htaccess`.
 - **Nothing persists.** No localStorage, no cookies, no network: the served page
   ships `connect-src 'none'`, and "wipe on tab hide" (default on) drops the
   report when the tab is backgrounded.
-- **Masking is cosmetic.** Seed, phrase, nsec, and the private-key body render as
-  bullets until revealed, but they are plain strings in memory — same caveat as
-  the terminal tool.
+- **Masking is cosmetic and per field.** Seed, phrase, nsec, and the private-key
+  body each carry their own reveal button on the Report tab, but they are plain
+  strings in memory — same caveat as the terminal tool.
+- **Colour means secrecy.** A `valueBlock` marked `secret` paints red, matching
+  the binary's private-value colour; anything unmasked is green. The
+  meltify-info tab reuses `renderText({ color: true })` and converts its SGR
+  sequences to spans (`lib/ansi.ts`), so the palette is never duplicated here.
 - **Clipboard has a fallback.** `navigator.clipboard` needs a secure context;
   the legacy `execCommand` path keeps copy working over plain http on a LAN.
 - **Hash routing only.** No rewrite rules needed, so the build drops into

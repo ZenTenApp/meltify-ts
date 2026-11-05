@@ -1,4 +1,4 @@
-/** Shared value display: masked secret blocks, copy actions, download buttons. */
+/** Shared value display: masked secret blocks, copy/reveal actions, download buttons. */
 
 import { copyText } from './clipboard.ts';
 import { el, toast } from './dom.ts';
@@ -33,30 +33,52 @@ export function maskValue(value: string): string {
 }
 
 export interface BlockOptions {
+  /** Secret material: rendered in the private (red) colour. */
   secret?: boolean;
-  revealed?: boolean;
+  /** Hide the value behind this field's own reveal button. Implies `secret`. */
+  masked?: boolean;
   /** Right-aligned metadata in the header, e.g. a length or a chain note. */
   note?: string;
 }
 
-/** A titled, monospaced value block with a copy button. */
+/** A titled, monospaced value block with copy (and, when masked, reveal) actions. */
 export function valueBlock(
   label: string,
   value: string,
   options: BlockOptions = {},
 ): HTMLElement {
-  const secret = options.secret === true;
-  const revealed = options.revealed === true;
-  const shown = secret && !revealed ? maskValue(value) : value;
+  const masked = options.masked === true;
+  const secret = options.secret === true || masked;
+  const hidden = maskValue(value);
+
+  const pre = el('pre', { class: masked ? 'masked' : undefined }, [masked ? hidden : value]);
+
+  const actions = el('span', { class: 'actions' });
+  if (masked) {
+    let shown = false;
+    const reveal = el('button', {
+      type: 'button',
+      class: 'btn ghost small',
+      title: `Reveal ${label}`,
+      'aria-pressed': 'false',
+    }, ['reveal']);
+    reveal.addEventListener('click', () => {
+      shown = !shown;
+      pre.textContent = shown ? value : hidden;
+      pre.classList.toggle('masked', !shown);
+      reveal.textContent = shown ? 'hide' : 'reveal';
+      reveal.title = `${shown ? 'Hide' : 'Reveal'} ${label}`;
+      reveal.setAttribute('aria-pressed', shown ? 'true' : 'false');
+    });
+    actions.append(reveal);
+  }
+  actions.append(copyAction(value, label));
 
   const meta: (Node | string)[] = [label];
   if (options.note !== undefined) meta.push(` · ${options.note}`);
 
   return el('div', { class: secret ? 'block secret' : 'block' }, [
-    el('header', {}, [
-      el('span', {}, meta),
-      el('span', { class: 'actions' }, [copyAction(value, label)]),
-    ]),
-    el('pre', {}, [shown]),
+    el('header', {}, [el('span', {}, meta), actions]),
+    pre,
   ]);
 }
