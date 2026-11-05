@@ -39,3 +39,32 @@ export const GOLDEN = {
   // its own implementation, so it is not an independent pin upstream.
   bchat: 'bdcdd6e612dc6ac3edbc24da774bc6cfabc6c26ae7a4762b7612750329a7df1d35',
 } as const;
+
+/**
+ * Subaccount seeds for the same fixed seed 00..1f.
+ *
+ * The derivation is `SHA256(SHA256(utf8(label)) || seed)` (Go's
+ * `sshkey.DeriveSubaccountKey`). These values were computed with Python's
+ * `hashlib` and Node's `node:crypto`, not with this port, so they pin the
+ * derivation independently; `test/subaccount.test.ts` recomputes them again
+ * inside the test.
+ */
+export const SUBACCOUNT_GOLDEN = {
+  label: 'alice',
+  seedHex: 'e2e4e464be0ad932cc00bde7a2b01d0d56cfc333a2b436c27daa65c6c6391abd',
+  // Downstream fields for that seed. These are regression pins recorded from the
+  // first implementation, not independent derivations; the seed above is the
+  // independent one.
+  mnemonic24:
+    'title cheese bomb lab pulse offer copy bless tray better also boy hollow thunder soldier final cycle become hedgehog slide hockey broken helmet person',
+  pubKeyHex: 'b52d4d01bf672e97b68ecc251fc1b08d679e59f92912b6b73457ae2b9b68561d',
+  npub: 'npub1k5k56qdlvuhf0d5wesj3lsds34neuk0e9yftdde527hzhxmg2cws93tkwg',
+} as const;
+
+/** Same derivation, other labels — keys only, since the report fields follow from them. */
+export const SUBACCOUNT_SEEDS: Readonly<Record<string, string>> = {
+  'alice': 'e2e4e464be0ad932cc00bde7a2b01d0d56cfc333a2b436c27daa65c6c6391abd',
+  'alice/work': 'bf90499dd10336156363185dd054e7e73c9fd4537cc1aee715dd48859d0733a4',
+  '日本語': '161adadb531ea10164df2ad995d9ec534164d8ad414fbc3dd3288d7ad2a2a794',
+  'a': 'ba12e7a5f08b8bec6f3b35936e889b04a455f407059d84ec12f417f952220589',
+};

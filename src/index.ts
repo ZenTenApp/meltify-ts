@@ -20,6 +20,13 @@ export {
   type MarshalledOpenSSHKey,
 } from './core/ssh/marshal.js';
 export { buildIdentityReport, type IdentityReport, type BuildIdentityReportInput } from './core/report.js';
+export {
+  deriveSubaccountSeed,
+  buildSubaccountReport,
+  SUBACCOUNT_KDF_ROUNDS,
+  type SubaccountReport,
+  type BuildSubaccountReportInput,
+} from './core/subaccount.js';
 export { renderText, type RenderTextOptions } from './render/text.js';
 
 export { mnemonic24FromSeed, seedFromMnemonic } from './core/derive/bip39.js';

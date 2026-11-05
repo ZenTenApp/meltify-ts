@@ -78,8 +78,9 @@ function send(payload: WorkerRequestPayload): Promise<WorkerResult> {
 export async function deriveFromKey(
   pem: string,
   passphrase: string,
+  subaccount = '',
 ): Promise<Extract<WorkerResult, { op: 'derive' }>> {
-  return (await send({ op: 'derive', pem, passphrase })) as Extract<
+  return (await send({ op: 'derive', pem, passphrase, subaccount })) as Extract<
     WorkerResult,
     { op: 'derive' }
   >;
@@ -88,8 +89,9 @@ export async function deriveFromKey(
 export async function deriveThrowaway(
   seedHex: string,
   passphrase: string,
+  subaccount = '',
 ): Promise<Extract<WorkerResult, { op: 'throwaway' }>> {
-  return (await send({ op: 'throwaway', seedHex, passphrase })) as Extract<
+  return (await send({ op: 'throwaway', seedHex, passphrase, subaccount })) as Extract<
     WorkerResult,
     { op: 'throwaway' }
   >;

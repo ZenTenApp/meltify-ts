@@ -141,6 +141,9 @@ export function mountKeys(ctx: Ctx): HTMLElement {
       hint(
         'The seed and passphrase stay in this tab, and the downloaded key is the only artifact that survives. Anything derived here is a real key: write it somewhere safe, then wipe this page.',
       ),
+      el('div', { class: 'row', style: 'margin-top: 12px' }, [
+        el('a', { class: 'btn ghost small', href: '#/derive' }, ['derive, or derive a subaccount']),
+      ]),
     ]),
   ]);
 }

@@ -25,7 +25,7 @@ runs in Node or a browser bundle.
 | M3 | CryptoNote legacy phrase, Monero/Beldex primaries, BChat ID | done |
 | M4 | OpenSSH parsing (bcrypt_pbkdf, AES-256-CTR, negative cases) | done |
 | M5 | Structured report + byte-compatible text renderer | done |
-| M6 | `--subaccount` wired end-to-end | marshaller exists, not wired |
+| M6 | `--subaccount` wired end-to-end | done (core + site) |
 | M7 | Differential CI against the Go binary | not started |
 
 ## Usage
@@ -53,10 +53,19 @@ console.log(renderText(report, { color: false }));
 `renderText` reproduces meltify's terminal layout; with `color: false` it is plain text
 intended to be byte-identical to Go's `NO_COLOR=1` output.
 
+For a subaccount (`meltify-info --subaccount <label>`), use `buildSubaccountReport`:
+
+```ts
+import { buildSubaccountReport } from 'meltify-ts';
+
+const sub = buildSubaccountReport({ seed: parsed.seed, label: 'work', passphrase });
+console.log(renderText(sub.report, { color: false })); // sub.report, sub.seed, sub.pem
+```
+
 Lower-level pieces are exported too: `mnemonic24FromSeed`, `nostrKeysFromMnemonic`,
 `deriveWalletAddresses`, `encodeLegacyMnemonic` / `decodeLegacyMnemonic`, `scReduce32`,
-`bchatChatId`, `moneroAddressFromLegacy`, `beldexAddressFromLegacy`, and the OpenSSH
-marshaller used for subaccounts.
+`bchatChatId`, `moneroAddressFromLegacy`, `beldexAddressFromLegacy`,
+`deriveSubaccountSeed`, and the OpenSSH marshaller used for subaccounts.
 
 ### Error behavior
 
@@ -160,9 +169,14 @@ written by semantic-release, so do not edit either by hand.
 - **Subaddresses** are not derived: `meltify-info` only prints Monero/Beldex primaries.
   The CryptoNote codec is structured so subaddress derivation can be added for the other
   sibling binaries later.
-- **`--subaccount`**: `marshalOpenSSHEd25519Key` supports the rounds=1 re-encryption and
-  deterministic test randomness, but subaccount activation is not yet exposed by the report
-  API (M6).
+- **`--subaccount`** is exposed by the library and the site:
+  `deriveSubaccountSeed(seed, label)` is the pure derivation, and
+  `buildSubaccountReport({ seed, label, passphrase })` returns the report with the
+  private-key block set to the re-encoded subaccount body. Matching meltify, the label is
+  hashed as UTF-8 (`SHA256(SHA256(utf8(label)) ‖ seed)`), an empty label means "no
+  subaccount", a passphrase is required, and the re-encryption keeps the source passphrase
+  at bcrypt rounds 1 — so the PEM body differs on every run while the derived identity does
+  not. The label is not printed anywhere, as upstream.
 - Only `openssh-key-v1` containers are parsed. Legacy PEM/PKCS#8 Ed25519 containers are not
   accepted; meltify's documented input is an OpenSSH-format Ed25519 key.
 - `test/fixtures/` contains **throwaway test keys** with the committed passphrase

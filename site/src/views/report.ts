@@ -19,8 +19,9 @@ const SECRET_FIELDS = [
   'privKeyHex',
 ] as const satisfies readonly (keyof IdentityReport)[];
 
-function publicSnapshot(report: IdentityReport): Record<string, unknown> {
+function publicSnapshot(report: IdentityReport, identity: Identity): Record<string, unknown> {
   return {
+    ...(identity.subaccount === '' ? {} : { subaccount: identity.subaccount }),
     fingerprint: report.fingerprint,
     publicKeyLine: report.publicKeyLine,
     npub: report.npub,
@@ -30,13 +31,14 @@ function publicSnapshot(report: IdentityReport): Record<string, unknown> {
   };
 }
 
-function redactedSnapshot(report: IdentityReport): Record<string, unknown> {
-  return { ...publicSnapshot(report), secretFields: '[redacted]' };
+function redactedSnapshot(report: IdentityReport, identity: Identity): Record<string, unknown> {
+  return { ...publicSnapshot(report, identity), secretFields: '[redacted]' };
 }
 
 function footer(identity: Identity): HTMLElement {
   return el('div', { class: 'pills' }, [
     pill(`source: ${identity.source}`),
+    ...(identity.subaccount === '' ? [] : [pill(`subaccount: ${identity.subaccount}`)]),
     pill(`derive ${identity.elapsedMs.toFixed(1)} ms`),
     pill(`${identity.report.addresses.length} addresses`),
     pill(`derived ${new Date(identity.derivedAt).toLocaleTimeString()}`),
@@ -73,7 +75,10 @@ export function mountReport(ctx: Ctx): HTMLElement {
       el('div', { class: 'blocks', style: 'margin-top: 14px' }, [
         valueBlock('private key body', report.privateKeyBlock, {
           masked: true,
-          note: 'base64 of openssh-key-v1',
+          note:
+            identity.subaccount === ''
+              ? 'base64 of openssh-key-v1'
+              : `subaccount body for “${identity.subaccount}”, bcrypt rounds 1`,
         }),
         valueBlock('ed25519 seed', report.seedHex, { masked: true, note: 'hex, 32 bytes' }),
         valueBlock('melt phrase', report.mnemonic24, { masked: true, note: '24 words' }),
@@ -107,7 +112,7 @@ export function mountReport(ctx: Ctx): HTMLElement {
           onclick: () => {
             downloadText(
               'meltify-public.json',
-              `${JSON.stringify({ generatedAt: new Date(identity.derivedAt).toISOString(), ...redactedSnapshot(report) }, null, 2)}\n`,
+              `${JSON.stringify({ generatedAt: new Date(identity.derivedAt).toISOString(), ...redactedSnapshot(report, identity) }, null, 2)}\n`,
               'application/json',
             );
             toast('Public JSON downloaded');
@@ -119,12 +124,24 @@ export function mountReport(ctx: Ctx): HTMLElement {
           onclick: () => {
             downloadText(
               'meltify-full.json',
-              `${JSON.stringify({ generatedAt: new Date(identity.derivedAt).toISOString(), source: identity.source, report }, null, 2)}\n`,
+              `${JSON.stringify({ generatedAt: new Date(identity.derivedAt).toISOString(), source: identity.source, ...(identity.subaccount === '' ? {} : { subaccount: identity.subaccount }), report }, null, 2)}\n`,
               'application/json',
             );
             toast('Full JSON downloaded — contains the seed');
           },
         }, ['Download full JSON']),
+        ...(identity.subaccountPem === undefined
+          ? []
+          : [
+              el('button', {
+                type: 'button',
+                class: 'btn',
+                onclick: () => {
+                  downloadText('id_ed25519_subaccount', identity.subaccountPem ?? '', 'application/octet-stream');
+                  toast('Subaccount key downloaded');
+                },
+              }, ['Download subaccount key']),
+            ]),
         copyAction(
           SECRET_FIELDS.map((field) => `${field}: ${String(report[field])}`).join('\n'),
           'all secret fields',
@@ -141,7 +158,9 @@ export function mountReport(ctx: Ctx): HTMLElement {
         }, ['Wipe and go to Derive']),
       ]),
       hint(
-        'The full export contains the raw seed and every secret. Public JSON keeps the fingerprint, npub, and addresses only.',
+        identity.subaccount === ''
+          ? 'The full export contains the raw seed and every secret. Public JSON keeps the fingerprint, npub, and addresses only.'
+          : 'This report is a subaccount: the private key body is the re-encoded subaccount key, not the source key, and it keeps the source passphrase. The full export contains the derived seed and every secret.',
       ),
     ]);
 
