@@ -1,3 +1,11 @@
+# [1.1.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.0.0...v1.1.0) (2026-11-05)
+
+
+### Features
+
+* add subaccounts and site parity ([d592f16](https://github.com/ZenTenApp/meltify-ts/commit/d592f16b51d0f148c287d3753e3df13a389ee3e5))
+* style ([4527a4f](https://github.com/ZenTenApp/meltify-ts/commit/4527a4f7c9fd345ad7500e3b80ff5cb30be432c5))
+
 # 1.0.0 (2026-11-05)
 
 
