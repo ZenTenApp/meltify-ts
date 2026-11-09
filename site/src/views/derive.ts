@@ -8,12 +8,12 @@ import { copyText } from '../lib/clipboard.ts';
 import { el, hint, message, toast } from '../lib/dom.ts';
 import { toHex } from '../lib/hex.ts';
 import { setIdentity, clearIdentity } from '../lib/store.ts';
+import { THROWAWAY_PASSPHRASE } from '../lib/throwaway.ts';
 import { deriveFromKey, deriveThrowaway, WorkerCallError } from '../lib/worker-client.ts';
 import type { Ctx } from '../app-types.ts';
 
 /** Pinned by the Go suite; "pin golden seed" makes the throwaway run reproducible. */
 const GOLDEN_SEED_HEX = '000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f';
-const THROWAWAY_PASSPHRASE = 'test-passphrase';
 
 const ERROR_HELP: Record<string, string> = {
   'key-not-password-protected': 'This key has no passphrase. meltify only accepts protected keys.',
@@ -48,6 +48,10 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     placeholder: 'optional — e.g. work',
   });
   const revealPass = el('button', { type: 'button', class: 'btn ghost small' }, ['show']);
+  const passphraseNote = el('p', { class: 'hint tight', hidden: true }, [
+    `Throwaway key passphrase: ${THROWAWAY_PASSPHRASE} — fixed and public, shown so you can reopen the key.`,
+  ]);
+
   const deriveButton = el('button', { type: 'button', class: 'btn primary' }, ['Derive identity']);
   const throwawayButton = el('button', { type: 'button', class: 'btn' }, ['Try a throwaway key']);
   const pinGolden = el('input', { type: 'checkbox', checked: true });
@@ -73,8 +77,17 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     notice.replaceChildren(message(text, 'err'));
   };
 
+  /** Keep the passphrase masked unless the reveal toggle or a throwaway run asks otherwise. */
+  const setPassphraseVisible = (visible: boolean): void => {
+    passphrase.type = visible ? 'text' : 'password';
+    revealPass.textContent = visible ? 'hide' : 'show';
+  };
+
   const applyKeyText = (text: string): void => {
     keyText.value = text.trim();
+    // A newly loaded key is not the throwaway key, so mask again.
+    passphraseNote.hidden = true;
+    setPassphraseVisible(false);
     clearNotice();
   };
 
@@ -112,9 +125,7 @@ export function mountDerive(ctx: Ctx): HTMLElement {
   });
 
   revealPass.addEventListener('click', () => {
-    const showing = passphrase.type === 'text';
-    passphrase.type = showing ? 'password' : 'text';
-    revealPass.textContent = showing ? 'show' : 'hide';
+    setPassphraseVisible(passphrase.type === 'password');
   });
 
   async function derive(): Promise<void> {
@@ -172,6 +183,8 @@ export function mountDerive(ctx: Ctx): HTMLElement {
       const result = await deriveThrowaway(seedHex, THROWAWAY_PASSPHRASE, subaccount.value.trim());
       keyText.value = result.pem;
       passphrase.value = THROWAWAY_PASSPHRASE;
+      passphraseNote.hidden = false;
+      setPassphraseVisible(true);
       sourceLabel.textContent = pinGolden.checked ? 'throwaway key (seed 00..1f)' : 'throwaway key (random)';
       setIdentity({
         report: result.report,
@@ -210,12 +223,16 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     const detail = (event as CustomEvent<{ pem: string; passphrase: string }>).detail;
     keyText.value = detail.pem;
     passphrase.value = detail.passphrase;
+    passphraseNote.hidden = true;
+    setPassphraseVisible(false);
     sourceLabel.textContent = 'newly generated key';
     clearNotice();
   });
   window.addEventListener('meltify:wipe', () => {
     keyText.value = '';
     passphrase.value = '';
+    passphraseNote.hidden = true;
+    setPassphraseVisible(false);
     subaccount.value = '';
     sourceLabel.textContent = '';
     clearNotice();
@@ -235,9 +252,12 @@ export function mountDerive(ctx: Ctx): HTMLElement {
         el('span', { class: 'label' }, ['or paste the armored key']),
         keyText,
       ]),
-      el('label', { class: 'field' }, [
-        el('span', { class: 'label' }, ['passphrase']),
-        el('div', { class: 'row tight' }, [passphrase, revealPass]),
+      el('div', {}, [
+        el('label', { class: 'field' }, [
+          el('span', { class: 'label' }, ['passphrase']),
+          el('div', { class: 'row tight' }, [passphrase, revealPass]),
+        ]),
+        passphraseNote,
       ]),
       el('label', { class: 'field' }, [
         el('span', { class: 'label' }, ['subaccount label']),

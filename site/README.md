@@ -39,7 +39,7 @@ and `.htaccess`.
 
 | Tab | Feature |
 | --- | --- |
-| Derive | File drop or paste, passphrase, optional subaccount label, throwaway key (pinned seed `00..1f` or random) |
+| Derive | File drop or paste, passphrase, optional subaccount label, throwaway key (pinned seed `00..1f` or random; its fixed `test-passphrase` is filled in and shown) |
 | Report | Secret + public blocks, per-field reveal, public/full JSON export, subaccount key download, wipe |
 | Chains | 30 labeled addresses grouped by family, filter, CSV export |
 | meltify-info | `renderText` output in meltify-info's own colours, `.txt` download (plain form is the parity target) |
