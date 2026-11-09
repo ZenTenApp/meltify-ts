@@ -41,9 +41,9 @@ and `.htaccess`.
 | --- | --- |
 | Derive | File drop or paste, passphrase, optional subaccount label, throwaway key (pinned seed `00..1f` or random; its fixed `test-passphrase` is filled in and shown) |
 | Report | Secret + public blocks, per-field reveal, public/full JSON export, subaccount key download, wipe |
-| Chains | 30 labeled addresses grouped by family, filter, CSV export |
+| Chains | 30 labeled addresses grouped by family, plus the Monero subaddresses and Cake/Unstoppable rows from `buildMoneroReport`; filter, CSV export |
 | meltify-info | `renderText` output in meltify-info's own colours, `.txt` download (plain form is the parity target) |
-| Phrase lab | seed → MELT/CryptoNote phrase, phrase → BIP39 seed, 25-word phrase → Monero/Beldex/BChat |
+| Phrase lab | seed → MELT/CryptoNote phrase plus the `meltify-monero` section (Monero primary + subaddresses 0,1–0,9, Cake/Unstoppable seed and its addresses), phrase → BIP39 seed, 25-word phrase → Monero/Beldex primaries and subaddresses + BChat |
 | Key tools | Marshal a new password-protected key (rounds 1 or 16) and hand it to Derive |
 | Self-check | Re-runs the pinned Go vectors against the loaded bundle |
 

@@ -31,7 +31,15 @@ const MNEMONIC_LEN = 25;
 const PREFIX_LEN = 3;
 
 export const MONERO_PRIMARY_PREFIX = Uint8Array.of(0x12);
+export const MONERO_SUBADDRESS_PREFIX = Uint8Array.of(0x2a);
 export const BELDEX_MAINNET_PREFIX = Uint8Array.of(0xd1, 0x01);
+export const BELDEX_SUBADDRESS_PREFIX = Uint8Array.of(0x74);
+
+/** Subaddresses per account printed by `meltify-monero` / `meltify-beldex`. */
+export const DEFAULT_SUBADDRESS_COUNT = 9;
+
+/** Domain separator for the Monero subaddress label hash. */
+const SUBADDRESS_LABEL = utf8ToBytes('SubAddr\0');
 
 /** Reduces a 32-byte little-endian integer modulo the Ed25519 group order. */
 export function scReduce32(input: Uint8Array): Uint8Array {
@@ -115,8 +123,20 @@ export interface CryptonotePublicKeys {
   viewPub: Uint8Array;
 }
 
-/** Spend/view public keys for a legacy phrase, matching go-monero's FullKeyPair. */
-export function cryptonotePublicKeysFromLegacy(phrase: string): CryptonotePublicKeys {
+/** Private and public spend/view keys of a legacy phrase (go-monero's FullKeyPair). */
+export interface CryptonoteKeyPair extends CryptonotePublicKeys {
+  spendPriv: Uint8Array;
+  viewPriv: Uint8Array;
+}
+
+/** A primary address plus the subaddresses derived from the same keys. */
+export interface CryptonoteAddressSet {
+  primary: string;
+  subaddresses: string[];
+}
+
+/** Spend/view key pair for a legacy phrase, matching go-monero's FullKeyPair. */
+export function cryptonoteKeyPairFromLegacy(phrase: string): CryptonoteKeyPair {
   const spendPriv = decodeLegacyMnemonic(phrase);
   const spendScalar = bytesToBigIntLE(spendPriv);
   if (spendScalar >= CURVE_ORDER) {
@@ -125,15 +145,86 @@ export function cryptonotePublicKeysFromLegacy(phrase: string): CryptonotePublic
   const spendPub = ed25519.Point.BASE.multiply(spendScalar).toBytes();
   const viewPriv = scReduce32(keccak_256(spendPriv));
   const viewPub = ed25519.Point.BASE.multiply(bytesToBigIntLE(viewPriv)).toBytes();
+  return { spendPriv, viewPriv, spendPub, viewPub };
+}
+
+/** Spend/view public keys for a legacy phrase, matching go-monero's FullKeyPair. */
+export function cryptonotePublicKeysFromLegacy(phrase: string): CryptonotePublicKeys {
+  const { spendPub, viewPub } = cryptonoteKeyPairFromLegacy(phrase);
   return { spendPub, viewPub };
+}
+
+/**
+ * Subaddress (major, minor) public keys.
+ *
+ * Mirrors Monero's `get_subaddress_secret_key`: m = Hs("SubAddr\0" || a || major ||
+ * minor), D = B + mG, then C = aD. `a` is the view private key, `B` the spend
+ * public key.
+ */
+export function cryptonoteSubaddressPublicKeys(
+  keys: CryptonoteKeyPair,
+  major: number,
+  minor: number,
+): CryptonotePublicKeys {
+  if (major === 0 && minor === 0) {
+    throw new MeltifyError('derivation', '(0,0) is the primary address, not a subaddress');
+  }
+  const majorBytes = new Uint8Array(4);
+  const minorBytes = new Uint8Array(4);
+  writeUint32LE(majorBytes, 0, major);
+  writeUint32LE(minorBytes, 0, minor);
+  const label = concatBytes(SUBADDRESS_LABEL, keys.viewPriv, majorBytes, minorBytes);
+  const m = scReduce32(keccak_256(label));
+
+  const spendPoint = ed25519.Point.fromBytes(keys.spendPub);
+  const subSpend = spendPoint.add(ed25519.Point.BASE.multiply(bytesToBigIntLE(m)));
+  const subView = subSpend.multiply(bytesToBigIntLE(keys.viewPriv));
+  return { spendPub: subSpend.toBytes(), viewPub: subView.toBytes() };
+}
+
+/** Base58 CryptoNote address for a network prefix and spend/view public keys. */
+export function encodeCryptonoteAddress(
+  prefix: Uint8Array,
+  spendPub: Uint8Array,
+  viewPub: Uint8Array,
+): string {
+  const data = concatBytes(prefix, spendPub, viewPub);
+  const checksum = keccak_256(data).slice(0, 4);
+  return base58xmr.encode(concatBytes(data, checksum));
 }
 
 /** CryptoNote address for a legacy phrase and network prefix. */
 export function cryptonoteAddressFromLegacy(phrase: string, prefix: Uint8Array): string {
   const { spendPub, viewPub } = cryptonotePublicKeysFromLegacy(phrase);
-  const data = concatBytes(prefix, spendPub, viewPub);
-  const checksum = keccak_256(data).slice(0, 4);
-  return base58xmr.encode(concatBytes(data, checksum));
+  return encodeCryptonoteAddress(prefix, spendPub, viewPub);
+}
+
+/** Primary address plus `(0, 1)`…`(0, count)` subaddresses for one coin. */
+export function cryptonoteAddressesFromLegacy(
+  phrase: string,
+  addressPrefix: Uint8Array,
+  subaddressPrefix: Uint8Array,
+  subaddressCount: number = DEFAULT_SUBADDRESS_COUNT,
+): CryptonoteAddressSet {
+  const keys = cryptonoteKeyPairFromLegacy(phrase);
+  const primary = encodeCryptonoteAddress(addressPrefix, keys.spendPub, keys.viewPub);
+  const subaddresses: string[] = [];
+  for (let minor = 1; minor <= subaddressCount; minor++) {
+    const sub = cryptonoteSubaddressPublicKeys(keys, 0, minor);
+    subaddresses.push(encodeCryptonoteAddress(subaddressPrefix, sub.spendPub, sub.viewPub));
+  }
+  return { primary, subaddresses };
+}
+
+/** Subaddress `(major, minor)` of a legacy phrase as a base58 address. */
+export function cryptonoteSubaddressFromLegacy(
+  phrase: string,
+  subaddressPrefix: Uint8Array,
+  major: number,
+  minor: number,
+): string {
+  const sub = cryptonoteSubaddressPublicKeys(cryptonoteKeyPairFromLegacy(phrase), major, minor);
+  return encodeCryptonoteAddress(subaddressPrefix, sub.spendPub, sub.viewPub);
 }
 
 export function moneroAddressFromLegacy(phrase: string): string {
@@ -142,6 +233,32 @@ export function moneroAddressFromLegacy(phrase: string): string {
 
 export function beldexAddressFromLegacy(phrase: string): string {
   return cryptonoteAddressFromLegacy(phrase, BELDEX_MAINNET_PREFIX);
+}
+
+/** Monero primary address plus its `(0, n)` subaddresses. */
+export function moneroAddressesFromLegacy(
+  phrase: string,
+  subaddressCount: number = DEFAULT_SUBADDRESS_COUNT,
+): CryptonoteAddressSet {
+  return cryptonoteAddressesFromLegacy(
+    phrase,
+    MONERO_PRIMARY_PREFIX,
+    MONERO_SUBADDRESS_PREFIX,
+    subaddressCount,
+  );
+}
+
+/** Beldex primary address plus its `(0, n)` subaddresses. */
+export function beldexAddressesFromLegacy(
+  phrase: string,
+  subaddressCount: number = DEFAULT_SUBADDRESS_COUNT,
+): CryptonoteAddressSet {
+  return cryptonoteAddressesFromLegacy(
+    phrase,
+    BELDEX_MAINNET_PREFIX,
+    BELDEX_SUBADDRESS_PREFIX,
+    subaddressCount,
+  );
 }
 
 /**

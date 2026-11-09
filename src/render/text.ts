@@ -7,23 +7,15 @@
  */
 
 import type { IdentityReport } from '../core/report.js';
+import { createPainters } from './style.js';
 
 export interface RenderTextOptions {
   /** Emit ANSI colors. Defaults to false, matching NO_COLOR/non-TTY output. */
   color?: boolean;
 }
 
-const RESET = '\x1b[0m';
-const BORDER = '\x1b[1;38;2;255;255;255m'; // bold + #FFFFFF
-const PUBLIC_VALUE = '\x1b[38;2;124;252;0m'; // #7CFC00
-const PRIVATE_VALUE = '\x1b[38;2;255;85;85m'; // #FF5555
-
 export function renderText(report: IdentityReport, options: RenderTextOptions = {}): string {
-  const color = options.color ?? false;
-  const paint = (code: string, text: string): string => (color ? `${code}${text}${RESET}` : text);
-  const border = (text: string): string => paint(BORDER, text);
-  const value = (text: string): string => paint(PUBLIC_VALUE, text);
-  const sensitive = (text: string): string => paint(PRIVATE_VALUE, text);
+  const { border, value, sensitive } = createPainters(options.color ?? false);
 
   const lines: string[] = [];
   const blank = (): void => {
