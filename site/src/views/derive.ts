@@ -45,8 +45,11 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     autocomplete: 'off',
     spellcheck: 'false',
     id: 'subaccount',
-    placeholder: 'optional — e.g. work',
+    required: true,
+    placeholder: 'required — e.g. work',
   });
+  /** Label filled in by the throwaway flow, which needs a subaccount like any other derive. */
+  const THROWAWAY_SUBACCOUNT = 'my-throwaway-subaccount';
   const revealPass = el('button', { type: 'button', class: 'btn ghost small' }, ['show']);
   const passphraseNote = el('p', { class: 'hint tight', hidden: true }, [
     `Throwaway key passphrase: ${THROWAWAY_PASSPHRASE} — fixed and public, shown so you can reopen the key.`,
@@ -54,9 +57,21 @@ export function mountDerive(ctx: Ctx): HTMLElement {
 
   const deriveButton = el('button', { type: 'button', class: 'btn primary' }, ['Derive identity']);
   const throwawayButton = el('button', { type: 'button', class: 'btn' }, ['Try a throwaway key']);
+  // A disabled button swallows pointer events, so the "required" tooltip lives on
+  // the wrapper instead.
+  const deriveButtonWrap = el('span', { class: 'tip' }, [deriveButton]);
   const pinGolden = el('input', { type: 'checkbox', checked: true });
   const notice = el('div');
   const sourceLabel = el('span', { class: 'hint' });
+
+  /** Derive stays disabled while the required subaccount label is blank. */
+  const syncDeriveEnabled = (): void => {
+    const missing = subaccount.value.trim() === '';
+    deriveButton.disabled = missing;
+    if (missing) deriveButtonWrap.title = 'A subaccount label is required';
+    else deriveButtonWrap.removeAttribute('title');
+  };
+  subaccount.addEventListener('input', syncDeriveEnabled);
 
   const status = (text: string): void => {
     notice.replaceChildren(message(text, 'warn'));
@@ -130,6 +145,10 @@ export function mountDerive(ctx: Ctx): HTMLElement {
 
   async function derive(): Promise<void> {
     clearNotice();
+    if (subaccount.value.trim() === '') {
+      status('A subaccount label is required — for example “work”.');
+      return;
+    }
     const pem = keyText.value.trim();
     if (pem.length === 0) {
       status('Paste a key, drop a file, or use “Try a throwaway key”.');
@@ -164,8 +183,8 @@ export function mountDerive(ctx: Ctx): HTMLElement {
       clearIdentity();
       showFailure(error);
     } finally {
-      deriveButton.disabled = false;
       deriveButton.textContent = 'Derive identity';
+      syncDeriveEnabled();
     }
   }
 
@@ -180,6 +199,8 @@ export function mountDerive(ctx: Ctx): HTMLElement {
         crypto.getRandomValues(seed);
         seedHex = toHex(seed);
       }
+      subaccount.value = THROWAWAY_SUBACCOUNT;
+      syncDeriveEnabled();
       const result = await deriveThrowaway(seedHex, THROWAWAY_PASSPHRASE, subaccount.value.trim());
       keyText.value = result.pem;
       passphrase.value = THROWAWAY_PASSPHRASE;
@@ -234,6 +255,7 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     passphraseNote.hidden = true;
     setPassphraseVisible(false);
     subaccount.value = '';
+    syncDeriveEnabled();
     sourceLabel.textContent = '';
     clearNotice();
   });
@@ -242,6 +264,8 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     el('h2', { style: 'margin: 0' }, ['Derive']),
     sourceLabel,
   ]);
+
+  syncDeriveEnabled();
 
   const root = el('div', { class: 'view' }, [
     el('section', { class: 'card' }, [
@@ -260,14 +284,14 @@ export function mountDerive(ctx: Ctx): HTMLElement {
         passphraseNote,
       ]),
       el('label', { class: 'field' }, [
-        el('span', { class: 'label' }, ['subaccount label']),
+        el('span', { class: 'label' }, ['subaccount label (required)']),
         subaccount,
       ]),
       el('p', { class: 'hint tight', style: 'margin-bottom: 14px' }, [
-        'A subaccount label derives a different deterministic key from the same source key: the seed becomes SHA256(SHA256(utf8(label)) ‖ seed), and the re-encoded key reuses this passphrase at bcrypt rounds 1. Leave it empty to derive the source identity.',
+        'A subaccount label is required. It derives a different deterministic key from the same source key: the seed becomes SHA256(SHA256(utf8(label)) ‖ seed), and the re-encoded key reuses this passphrase at bcrypt rounds 1. The label is not secret, but it is the only thing you need to remember to get this identity back.',
       ]),
       el('div', { class: 'row' }, [
-        deriveButton,
+        deriveButtonWrap,
         throwawayButton,
         el('label', { class: 'switch' }, [pinGolden, el('span', {}, ['pin seed 00..1f'])]),
       ]),
