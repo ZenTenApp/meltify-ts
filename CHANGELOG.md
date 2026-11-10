@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.2.0...v1.3.0) (2026-11-10)
+
+
+### Features
+
+* require bip39 passphrase ([14a185f](https://github.com/ZenTenApp/meltify-ts/commit/14a185f340253bb21c11d12ecc2fec7a6891d0c2))
+
 # [1.2.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.1.0...v1.2.0) (2026-11-10)
 
 

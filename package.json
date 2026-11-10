@@ -1,6 +1,6 @@
 {
   "name": "meltify-ts",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "type": "module",
   "description": "TypeScript port of meltify (meltify-info parity): derive an identity report from an Ed25519 OpenSSH key.",
