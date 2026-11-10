@@ -1,3 +1,12 @@
+# [1.2.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.1.0...v1.2.0) (2026-11-10)
+
+
+### Features
+
+* add monero to site ([6f46996](https://github.com/ZenTenApp/meltify-ts/commit/6f4699642889f34c05254315bc2df492c7df379f))
+* require subaccount ([0507736](https://github.com/ZenTenApp/meltify-ts/commit/0507736437e60caf16d7ae5bc884071ebf2eb4a0))
+* show throwaway password ([198b967](https://github.com/ZenTenApp/meltify-ts/commit/198b9670516ed50ff4d638931af8afe9f2105972))
+
 # [1.1.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.0.0...v1.1.0) (2026-11-05)
 
 
