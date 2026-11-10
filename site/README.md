@@ -39,7 +39,7 @@ and `.htaccess`.
 
 | Tab | Feature |
 | --- | --- |
-| Derive | File drop or paste, passphrase, required subaccount label, required BIP39 passphrase, throwaway key (pinned seed `00..1f` or random; its fixed `test-passphrase` and `test-bip39-passphrase` are filled in and shown) |
+| Derive | File drop or paste, passphrase, subaccount label and BIP39 passphrase (both optional, both recommended), throwaway key (pinned seed `00..1f` or random; its fixed `test-passphrase` and `test-bip39-passphrase` are filled in and shown) |
 | Report | Secret + public blocks, per-field reveal, public/full JSON export, subaccount key download, wipe |
 | Chains | 30 labeled addresses grouped by family, plus the Monero subaddresses and Cake/Unstoppable rows from `buildMoneroReport`; filter, CSV export |
 | meltify-info | `renderText` output in meltify-info's own colours, `.txt` download (plain form is the parity target) |
@@ -58,27 +58,24 @@ and `.htaccess`.
 - **Masking is cosmetic and per field.** Seed, phrase, nsec, and the private-key
   body each carry their own reveal button on the Report tab, but they are plain
   strings in memory — same caveat as the terminal tool.
-- **Subaccounts are a label on Derive, not a tab.** The label is required:
-  Derive stays disabled, with a “A subaccount label is required” tooltip, until
-  it is filled, and *Try a throwaway key* fills in `my-throwaway-subaccount`.
-  Filling it derives the child identity in the same worker call and re-encodes
-  the key with the same passphrase at bcrypt rounds 1, exactly like
-  `meltify-info --subaccount`. Every other tab then shows the subaccount's
-  identity, the Report footer names the label, and the Report export offers the
-  re-encoded subaccount key. The library still treats an empty label as the
-  source key — the site is what refuses to derive one. The label itself is not
-  secret, and it is the only thing that has to be remembered to get the
-  subaccount back.
-- **The BIP39 passphrase is required, like the subaccount label.** Derive stays
-  disabled until both are filled, with a tooltip naming the missing one; *Try a
-  throwaway key* fills `test-bip39-passphrase`. The passphrase is fed to the
-  PBKDF2 step in `buildIdentityReport({ bip39Passphrase })`, so it moves the
-  Nostr keys and the 28 BIP39-seeded address rows and leaves the seed, the
-  phrases, the SSH key, Monero and Beldex alone. Two consequences are stated in
-  the UI rather than hidden: `meltify-info` has no equivalent flag, so the
-  copied command reproduces the key but not the addresses, and the public JSON
-  export marks the passphrase `[set — not exported]` while the full export
-  includes it, because the addresses cannot be reproduced without it.
+- **Subaccounts are a label on Derive, not a tab, and the label is optional.** Filling
+  it derives the child identity in the same worker call and re-encodes the key with
+  the same passphrase at bcrypt rounds 1, exactly like `meltify-info --subaccount`.
+  Every other tab then shows the subaccount's identity, the Report footer names the
+  label, and the Report export offers the re-encoded subaccount key. An empty label
+  is the source key, the same as the library. The label is not secret, and it is the
+  only thing that has to be remembered to get the subaccount back, so the field is
+  labeled *optional, recommended* and *Try a throwaway key* fills in
+  `my-throwaway-subaccount` to show the recommended path.
+- **The BIP39 passphrase is optional too, and recommended the same way.** It is fed
+  to the PBKDF2 step in `buildIdentityReport({ bip39Passphrase })`, so it moves the
+  Nostr keys and the 28 BIP39-seeded address rows and leaves the seed, the phrases,
+  the SSH key, Monero and Beldex alone. Empty is the standard derivation, the one
+  `meltify-info` produces, so an empty run does reproduce the binary's addresses; a
+  filled one does not, and the UI says so rather than hiding it. The public JSON
+  export marks a set passphrase `[set — not exported]` (and omits the marker when it
+  is empty) while the full export includes it, because the addresses cannot be
+  reproduced without it.
 - **Colour means secrecy.** A `valueBlock` marked `secret` paints red, matching
   the binary's private-value colour; anything unmasked is green. The
   meltify-info tab reuses `renderText({ color: true })` and converts its SGR

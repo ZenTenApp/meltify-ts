@@ -45,18 +45,16 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     autocomplete: 'off',
     spellcheck: 'false',
     id: 'subaccount',
-    required: true,
-    placeholder: 'required — e.g. work',
+    placeholder: 'optional, recommended — e.g. work',
   });
   const bip39Passphrase = el('input', {
     type: 'password',
     autocomplete: 'off',
     spellcheck: 'false',
     id: 'bip39-passphrase',
-    required: true,
-    placeholder: 'required — the 25th word you set on this wallet',
+    placeholder: 'optional, recommended — the 25th word, if this wallet has one',
   });
-  /** Label filled in by the throwaway flow, which needs a subaccount like any other derive. */
+  /** Label filled in by the throwaway flow so the demo shows the recommended path. */
   const THROWAWAY_SUBACCOUNT = 'my-throwaway-subaccount';
   const revealPass = el('button', { type: 'button', class: 'btn ghost small' }, ['show']);
   const revealBip39 = el('button', { type: 'button', class: 'btn ghost small' }, ['show']);
@@ -66,25 +64,9 @@ export function mountDerive(ctx: Ctx): HTMLElement {
 
   const deriveButton = el('button', { type: 'button', class: 'btn primary' }, ['Derive identity']);
   const throwawayButton = el('button', { type: 'button', class: 'btn' }, ['Try a throwaway key']);
-  // A disabled button swallows pointer events, so the "required" tooltip lives on
-  // the wrapper instead.
-  const deriveButtonWrap = el('span', { class: 'tip' }, [deriveButton]);
   const pinGolden = el('input', { type: 'checkbox', checked: true });
   const notice = el('div');
   const sourceLabel = el('span', { class: 'hint' });
-
-  /** Derive stays disabled while either required field is blank. */
-  const syncDeriveEnabled = (): void => {
-    const missingSubaccount = subaccount.value.trim() === '';
-    const missingPassphrase = bip39Passphrase.value === '';
-    const missing = missingSubaccount || missingPassphrase;
-    deriveButton.disabled = missing;
-    if (missingSubaccount) deriveButtonWrap.title = 'A subaccount label is required';
-    else if (missingPassphrase) deriveButtonWrap.title = 'A BIP39 passphrase is required';
-    else deriveButtonWrap.removeAttribute('title');
-  };
-  subaccount.addEventListener('input', syncDeriveEnabled);
-  bip39Passphrase.addEventListener('input', syncDeriveEnabled);
 
   const status = (text: string): void => {
     notice.replaceChildren(message(text, 'warn'));
@@ -168,16 +150,6 @@ export function mountDerive(ctx: Ctx): HTMLElement {
 
   async function derive(): Promise<void> {
     clearNotice();
-    if (subaccount.value.trim() === '') {
-      status('A subaccount label is required — for example “work”.');
-      return;
-    }
-    if (bip39Passphrase.value === '') {
-      status(
-        'A BIP39 passphrase is required. Use the passphrase you set on the wallet these addresses belong to.',
-      );
-      return;
-    }
     const pem = keyText.value.trim();
     if (pem.length === 0) {
       status('Paste a key, drop a file, or use “Try a throwaway key”.');
@@ -218,8 +190,8 @@ export function mountDerive(ctx: Ctx): HTMLElement {
       clearIdentity();
       showFailure(error);
     } finally {
+      deriveButton.disabled = false;
       deriveButton.textContent = 'Derive identity';
-      syncDeriveEnabled();
     }
   }
 
@@ -236,7 +208,6 @@ export function mountDerive(ctx: Ctx): HTMLElement {
       }
       subaccount.value = THROWAWAY_SUBACCOUNT;
       bip39Passphrase.value = THROWAWAY_BIP39_PASSPHRASE;
-      syncDeriveEnabled();
       const result = await deriveThrowaway(
         seedHex,
         THROWAWAY_PASSPHRASE,
@@ -300,7 +271,6 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     subaccount.value = '';
     bip39Passphrase.value = '';
     setBip39Visible(false);
-    syncDeriveEnabled();
     sourceLabel.textContent = '';
     clearNotice();
   });
@@ -309,8 +279,6 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     el('h2', { style: 'margin: 0' }, ['Derive']),
     sourceLabel,
   ]);
-
-  syncDeriveEnabled();
 
   const root = el('div', { class: 'view' }, [
     el('section', { class: 'card' }, [
@@ -329,21 +297,21 @@ export function mountDerive(ctx: Ctx): HTMLElement {
         passphraseNote,
       ]),
       el('label', { class: 'field' }, [
-        el('span', { class: 'label' }, ['subaccount label (required)']),
+        el('span', { class: 'label' }, ['subaccount label (optional, recommended)']),
         subaccount,
       ]),
       el('p', { class: 'hint tight', style: 'margin-bottom: 14px' }, [
-        'A subaccount label is required. It derives a different deterministic key from the same source key: the seed becomes SHA256(SHA256(utf8(label)) ‖ seed), and the re-encoded key reuses this passphrase at bcrypt rounds 1. The label is not secret, but it is the only thing you need to remember to get this identity back.',
+        'Recommended: a subaccount label derives a different deterministic key from the same source key — the seed becomes SHA256(SHA256(utf8(label)) ‖ seed), and the re-encoded key reuses this passphrase at bcrypt rounds 1. The label is not secret, and it is the only thing you need to remember to get this identity back. Leave it empty to derive the source identity.',
       ]),
       el('label', { class: 'field' }, [
-        el('span', { class: 'label' }, ['BIP39 passphrase (required)']),
+        el('span', { class: 'label' }, ['BIP39 passphrase (optional, recommended)']),
         el('div', { class: 'row tight' }, [bip39Passphrase, revealBip39]),
       ]),
       el('p', { class: 'hint tight', style: 'margin-bottom: 14px' }, [
-        'A BIP39 passphrase is required: the “25th word” you set on the wallet these addresses belong to. It is the PBKDF2 input that turns the 24 words into the BIP39 seed, so it changes the Nostr keys and every chain address except Monero and Beldex — those come from the CryptoNote phrase, which has no BIP39 step. The 24 words, the seed, and the SSH key do not change. It is not stored and is used only in the worker.',
+        'Recommended: the BIP39 passphrase is the “25th word” you set on the wallet these addresses belong to. It is the PBKDF2 input that turns the 24 words into the BIP39 seed, so it changes the Nostr keys and every chain address except Monero and Beldex — those come from the CryptoNote phrase, which has no BIP39 step. The 24 words, the seed, and the SSH key do not change. Leave it empty for the standard derivation: every BIP39 chain address will then match meltify-info, and will not match a wallet that uses a 25th word. It is not stored and is used only in the worker.',
       ]),
       el('div', { class: 'row' }, [
-        deriveButtonWrap,
+        deriveButton,
         throwawayButton,
         el('label', { class: 'switch' }, [pinGolden, el('span', {}, ['pin seed 00..1f'])]),
       ]),

@@ -63,7 +63,7 @@ const sub = buildSubaccountReport({ seed: parsed.seed, label: 'work', passphrase
 console.log(renderText(sub.report, { color: false })); // sub.report, sub.seed, sub.pem
 ```
 
-### BIP39 passphrase (optional in the core, required in the site)
+### BIP39 passphrase (optional in the core, optional and recommended in the site)
 
 Both report builders take an optional `bip39Passphrase` — the "25th word" fed to the
 PBKDF2 step that turns the 24 words into the BIP39 seed. It defaults to `''`, which is the
@@ -231,13 +231,13 @@ written by semantic-release, so do not edit either by hand.
   not. The label is not printed anywhere, as upstream.
 - Only `openssh-key-v1` containers are parsed. Legacy PEM/PKCS#8 Ed25519 containers are not
   accepted; meltify's documented input is an OpenSSH-format Ed25519 key.
-- **The site requires a BIP39 passphrase; the library and `meltify-info` do not.** Upstream
-  has no such flag, so a site report no longer reproduces `meltify-info`'s address rows:
-  the fingerprint, the 24 words, the CryptoNote phrase and the Monero/Beldex/BChat rows
-  still match, and the chain addresses do not. That is a deliberate site policy — it makes
-  "which passphrase does this wallet use?" an explicit, answered question instead of a
-  silent assumption — not parity with the Go binary. The core keeps `''` as its default so
-  the differential suite and every golden stay valid.
+- **The site recommends a BIP39 passphrase; neither it nor the library requires one.**
+  Upstream has no such flag. Left empty (the default), a site report reproduces
+  `meltify-info` row for row. Filled in, the fingerprint, the 24 words, the CryptoNote
+  phrase and the Monero/Beldex/BChat rows still match and the chain addresses do not —
+  which is the point: it makes "which passphrase does this wallet use?" an explicit,
+  answered question instead of a silent assumption. The core keeps `''` as its default
+  so the differential suite and every golden stay valid.
 - `test/fixtures/` contains **throwaway test keys** with the committed passphrase
   `test-passphrase`. They protect nothing and exist only to exercise the parser.
 

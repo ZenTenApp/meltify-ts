@@ -225,7 +225,7 @@ function selfCheck(): WorkerResult {
     check('bchat chat id', report.bchat, GOLDEN.bchat);
     check('renderText line count', renderText(report).split('\n').length, 72);
 
-    // BIP39 passphrase path (the site requires one). Nothing in the Go vectors
+    // BIP39 passphrase path (optional, but the site recommends one). Nothing in the Go vectors
     // covers it — meltify-info has no such flag — so these rows pin the two
     // things that matter: the passphrase moves the BIP39-seeded values, and it
     // leaves the seed, the phrases, the SSH key and the CryptoNote rows alone.
