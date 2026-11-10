@@ -12,9 +12,10 @@ export interface Identity {
   /** Subaccount label the report was derived for; '' when it is the source key. */
   subaccount: string;
   /**
-   * BIP39 passphrase the report was derived with. Required by the site, so it is
-   * never empty; it lives here so the Report tab can say which passphrase the
-   * addresses depend on and the full export can reproduce them.
+   * BIP39 passphrase the report was derived with; '' when it was left empty (the
+   * standard derivation). Optional in the site and in the core, but the Derive
+   * view recommends it, and the Report tab needs it to say which derivation the
+   * addresses come from.
    */
   bip39Passphrase: string;
   /** Re-encoded subaccount PEM (same passphrase, bcrypt rounds 1); absent for the source key. */

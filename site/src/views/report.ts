@@ -23,8 +23,9 @@ function publicSnapshot(report: IdentityReport, identity: Identity): Record<stri
   return {
     ...(identity.subaccount === '' ? {} : { subaccount: identity.subaccount }),
     // The value is a secret; the marker is what a reader needs to know, because
-    // it is what makes the addresses below non-standard.
-    bip39Passphrase: '[set — not exported]',
+    // it is what makes the addresses below non-standard. Absent means the
+    // standard derivation, which is what the addresses already say.
+    ...(identity.bip39Passphrase === '' ? {} : { bip39Passphrase: '[set — not exported]' }),
     fingerprint: report.fingerprint,
     publicKeyLine: report.publicKeyLine,
     npub: report.npub,
@@ -38,11 +39,26 @@ function redactedSnapshot(report: IdentityReport, identity: Identity): Record<st
   return { ...publicSnapshot(report, identity), secretFields: '[redacted]' };
 }
 
+/**
+ * One sentence naming the caveats that actually apply: whether the private key body is a
+ * re-encoded subaccount, and whether a BIP39 passphrase moved the addresses.
+ */
+function exportHint(identity: Identity): string {
+  const subject =
+    identity.subaccount === ''
+      ? 'The full export contains the raw seed'
+      : 'This report is a subaccount: the private key body is the re-encoded subaccount key, not the source key, and it keeps the source passphrase. The full export contains the derived seed';
+  const passphrase = identity.bip39Passphrase === '' ? '' : ', the BIP39 passphrase,';
+  return `${subject}${passphrase}, and every secret. Public JSON keeps the fingerprint, npub, and addresses only.`;
+}
+
 function footer(identity: Identity): HTMLElement {
   return el('div', { class: 'pills' }, [
     pill(`source: ${identity.source}`),
     ...(identity.subaccount === '' ? [] : [pill(`subaccount: ${identity.subaccount}`)]),
-    pill('bip39 passphrase: set'),
+    pill(
+      identity.bip39Passphrase === '' ? 'bip39 passphrase: none' : 'bip39 passphrase: set',
+    ),
     pill(`derive ${identity.elapsedMs.toFixed(1)} ms`),
     pill(`${identity.report.addresses.length} addresses`),
     pill(`derived ${new Date(identity.derivedAt).toLocaleTimeString()}`),
@@ -128,7 +144,7 @@ export function mountReport(ctx: Ctx): HTMLElement {
           onclick: () => {
             downloadText(
               'meltify-full.json',
-              `${JSON.stringify({ generatedAt: new Date(identity.derivedAt).toISOString(), source: identity.source, ...(identity.subaccount === '' ? {} : { subaccount: identity.subaccount }), bip39Passphrase: identity.bip39Passphrase, report }, null, 2)}\n`,
+              `${JSON.stringify({ generatedAt: new Date(identity.derivedAt).toISOString(), source: identity.source, ...(identity.subaccount === '' ? {} : { subaccount: identity.subaccount }), ...(identity.bip39Passphrase === '' ? {} : { bip39Passphrase: identity.bip39Passphrase }), report }, null, 2)}\n`,
               'application/json',
             );
             toast('Full JSON downloaded — contains the seed');
@@ -161,11 +177,7 @@ export function mountReport(ctx: Ctx): HTMLElement {
           },
         }, ['Wipe and go to Derive']),
       ]),
-      hint(
-        identity.subaccount === ''
-          ? 'The full export contains the raw seed, the BIP39 passphrase, and every secret. Public JSON keeps the fingerprint, npub, and addresses only.'
-          : 'This report is a subaccount: the private key body is the re-encoded subaccount key, not the source key, and it keeps the source passphrase. The full export contains the derived seed, the BIP39 passphrase, and every secret.',
-      ),
+      hint(exportHint(identity)),
     ]);
 
     root.replaceChildren(secrets, publicCard, exportCard);

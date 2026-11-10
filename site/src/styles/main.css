@@ -316,12 +316,7 @@ a:focus-visible {
 }
 .btn:disabled {
   opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Wrapper that carries the tooltip for a disabled button. */
-.tip {
-  display: inline-flex;
+  cursor: progress;
 }
 
 .drop {
