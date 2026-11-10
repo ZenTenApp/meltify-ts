@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.3.0...v1.4.0) (2026-11-10)
+
+
+### Features
+
+* make subaccount and bip39 passphrase optional but recommended for the meltify website ([a4f583f](https://github.com/ZenTenApp/meltify-ts/commit/a4f583f511c5d08b02848d436c2ccc73d3ca8eb5))
+
 # [1.3.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.2.0...v1.3.0) (2026-11-10)
 
 
