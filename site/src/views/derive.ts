@@ -8,7 +8,7 @@ import { copyText } from '../lib/clipboard.ts';
 import { el, hint, message, toast } from '../lib/dom.ts';
 import { toHex } from '../lib/hex.ts';
 import { setIdentity, clearIdentity } from '../lib/store.ts';
-import { THROWAWAY_PASSPHRASE } from '../lib/throwaway.ts';
+import { THROWAWAY_BIP39_PASSPHRASE, THROWAWAY_PASSPHRASE } from '../lib/throwaway.ts';
 import { deriveFromKey, deriveThrowaway, WorkerCallError } from '../lib/worker-client.ts';
 import type { Ctx } from '../app-types.ts';
 
@@ -48,11 +48,20 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     required: true,
     placeholder: 'required — e.g. work',
   });
+  const bip39Passphrase = el('input', {
+    type: 'password',
+    autocomplete: 'off',
+    spellcheck: 'false',
+    id: 'bip39-passphrase',
+    required: true,
+    placeholder: 'required — the 25th word you set on this wallet',
+  });
   /** Label filled in by the throwaway flow, which needs a subaccount like any other derive. */
   const THROWAWAY_SUBACCOUNT = 'my-throwaway-subaccount';
   const revealPass = el('button', { type: 'button', class: 'btn ghost small' }, ['show']);
+  const revealBip39 = el('button', { type: 'button', class: 'btn ghost small' }, ['show']);
   const passphraseNote = el('p', { class: 'hint tight', hidden: true }, [
-    `Throwaway key passphrase: ${THROWAWAY_PASSPHRASE} — fixed and public, shown so you can reopen the key.`,
+    `Throwaway key passphrase: ${THROWAWAY_PASSPHRASE}, and throwaway BIP39 passphrase: ${THROWAWAY_BIP39_PASSPHRASE} — both fixed and public, shown so you can reproduce the run.`,
   ]);
 
   const deriveButton = el('button', { type: 'button', class: 'btn primary' }, ['Derive identity']);
@@ -64,14 +73,18 @@ export function mountDerive(ctx: Ctx): HTMLElement {
   const notice = el('div');
   const sourceLabel = el('span', { class: 'hint' });
 
-  /** Derive stays disabled while the required subaccount label is blank. */
+  /** Derive stays disabled while either required field is blank. */
   const syncDeriveEnabled = (): void => {
-    const missing = subaccount.value.trim() === '';
+    const missingSubaccount = subaccount.value.trim() === '';
+    const missingPassphrase = bip39Passphrase.value === '';
+    const missing = missingSubaccount || missingPassphrase;
     deriveButton.disabled = missing;
-    if (missing) deriveButtonWrap.title = 'A subaccount label is required';
+    if (missingSubaccount) deriveButtonWrap.title = 'A subaccount label is required';
+    else if (missingPassphrase) deriveButtonWrap.title = 'A BIP39 passphrase is required';
     else deriveButtonWrap.removeAttribute('title');
   };
   subaccount.addEventListener('input', syncDeriveEnabled);
+  bip39Passphrase.addEventListener('input', syncDeriveEnabled);
 
   const status = (text: string): void => {
     notice.replaceChildren(message(text, 'warn'));
@@ -143,10 +156,26 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     setPassphraseVisible(passphrase.type === 'password');
   });
 
+  /** Keeps the BIP39 passphrase masked; it is a wallet secret, not a label. */
+  const setBip39Visible = (visible: boolean): void => {
+    bip39Passphrase.type = visible ? 'text' : 'password';
+    revealBip39.textContent = visible ? 'hide' : 'show';
+  };
+  setBip39Visible(false);
+  revealBip39.addEventListener('click', () => {
+    setBip39Visible(bip39Passphrase.type === 'password');
+  });
+
   async function derive(): Promise<void> {
     clearNotice();
     if (subaccount.value.trim() === '') {
       status('A subaccount label is required — for example “work”.');
+      return;
+    }
+    if (bip39Passphrase.value === '') {
+      status(
+        'A BIP39 passphrase is required. Use the passphrase you set on the wallet these addresses belong to.',
+      );
       return;
     }
     const pem = keyText.value.trim();
@@ -167,13 +196,19 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     deriveButton.disabled = true;
     deriveButton.textContent = 'Deriving…';
     try {
-      const result = await deriveFromKey(pem, passphrase.value, subaccount.value.trim());
+      const result = await deriveFromKey(
+        pem,
+        passphrase.value,
+        bip39Passphrase.value,
+        subaccount.value.trim(),
+      );
       setIdentity({
         report: result.report,
         seedHex: result.seedHex,
         elapsedMs: result.elapsedMs,
         source: sourceLabel.textContent === '' ? 'pasted key' : sourceLabel.textContent,
         subaccount: result.subaccount,
+        bip39Passphrase: result.bip39Passphrase,
         ...(result.pem === undefined ? {} : { subaccountPem: result.pem }),
         derivedAt: Date.now(),
       });
@@ -200,12 +235,19 @@ export function mountDerive(ctx: Ctx): HTMLElement {
         seedHex = toHex(seed);
       }
       subaccount.value = THROWAWAY_SUBACCOUNT;
+      bip39Passphrase.value = THROWAWAY_BIP39_PASSPHRASE;
       syncDeriveEnabled();
-      const result = await deriveThrowaway(seedHex, THROWAWAY_PASSPHRASE, subaccount.value.trim());
+      const result = await deriveThrowaway(
+        seedHex,
+        THROWAWAY_PASSPHRASE,
+        THROWAWAY_BIP39_PASSPHRASE,
+        subaccount.value.trim(),
+      );
       keyText.value = result.pem;
       passphrase.value = THROWAWAY_PASSPHRASE;
       passphraseNote.hidden = false;
       setPassphraseVisible(true);
+      setBip39Visible(true);
       sourceLabel.textContent = pinGolden.checked ? 'throwaway key (seed 00..1f)' : 'throwaway key (random)';
       setIdentity({
         report: result.report,
@@ -213,6 +255,7 @@ export function mountDerive(ctx: Ctx): HTMLElement {
         elapsedMs: result.elapsedMs,
         source: sourceLabel.textContent,
         subaccount: result.subaccount,
+        bip39Passphrase: result.bip39Passphrase,
         ...(result.subaccount === '' ? {} : { subaccountPem: result.pem }),
         derivedAt: Date.now(),
       });
@@ -255,6 +298,8 @@ export function mountDerive(ctx: Ctx): HTMLElement {
     passphraseNote.hidden = true;
     setPassphraseVisible(false);
     subaccount.value = '';
+    bip39Passphrase.value = '';
+    setBip39Visible(false);
     syncDeriveEnabled();
     sourceLabel.textContent = '';
     clearNotice();
@@ -290,6 +335,13 @@ export function mountDerive(ctx: Ctx): HTMLElement {
       el('p', { class: 'hint tight', style: 'margin-bottom: 14px' }, [
         'A subaccount label is required. It derives a different deterministic key from the same source key: the seed becomes SHA256(SHA256(utf8(label)) ‖ seed), and the re-encoded key reuses this passphrase at bcrypt rounds 1. The label is not secret, but it is the only thing you need to remember to get this identity back.',
       ]),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'label' }, ['BIP39 passphrase (required)']),
+        el('div', { class: 'row tight' }, [bip39Passphrase, revealBip39]),
+      ]),
+      el('p', { class: 'hint tight', style: 'margin-bottom: 14px' }, [
+        'A BIP39 passphrase is required: the “25th word” you set on the wallet these addresses belong to. It is the PBKDF2 input that turns the 24 words into the BIP39 seed, so it changes the Nostr keys and every chain address except Monero and Beldex — those come from the CryptoNote phrase, which has no BIP39 step. The 24 words, the seed, and the SSH key do not change. It is not stored and is used only in the worker.',
+      ]),
       el('div', { class: 'row' }, [
         deriveButtonWrap,
         throwawayButton,
@@ -317,6 +369,9 @@ export function mountDerive(ctx: Ctx): HTMLElement {
         }, ['copy the meltify-info equivalent']),
         el('a', { class: 'btn ghost small', href: '#/phrases' }, ['phrase lab']),
         el('a', { class: 'btn ghost small', href: '#/keys' }, ['key tools']),
+      ]),
+      el('p', { class: 'hint tight', style: 'margin-top: 12px' }, [
+        'meltify-info has no BIP39 passphrase flag: the copied command derives the key and the phrase, but its addresses assume no 25th word, so they will not match this page. Cross-check the fingerprint, the 24 words and the Monero/Beldex rows, not the chain addresses.',
       ]),
     ]),
   ]);

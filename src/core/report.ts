@@ -41,22 +41,33 @@ export interface BuildIdentityReportInput {
   seed: Uint8Array;
   /** Base64 of the OpenSSH private-key body to echo in the first block. */
   keyBodyB64: string;
+  /**
+   * BIP39 passphrase (the "25th word") for the mnemonic -> seed step. Defaults
+   * to `''`, which is the standard derivation and the only one `meltify-info`
+   * can produce.
+   *
+   * A non-empty value changes every field derived from the BIP39 seed (Nostr
+   * keys and all chain addresses except Monero and Beldex) and leaves the rest
+   * of the report untouched, because the seed, the phrase, the SSH key and the
+   * CryptoNote phrase all come from the Ed25519 seed directly.
+   */
+  bip39Passphrase?: string;
 }
 
 export function buildIdentityReport(input: BuildIdentityReportInput): IdentityReport {
-  const { seed, keyBodyB64 } = input;
+  const { seed, keyBodyB64, bip39Passphrase = '' } = input;
   if (seed.length !== 32) {
     throw new Error(`expected a 32-byte Ed25519 seed, got ${seed.length}`);
   }
 
   const mnemonic24 = mnemonic24FromSeed(seed);
-  const nostr = nostrKeysFromMnemonic(mnemonic24);
+  const nostr = nostrKeysFromMnemonic(mnemonic24, bip39Passphrase);
   const publicKey = ed25519.getPublicKey(seed);
   const publicKeyBlob = sshEd25519PublicKeyBlob(publicKey);
 
   const reducedSeed = scReduce32(seed);
   const legacyPhrase = encodeLegacyMnemonic(reducedSeed);
-  const addresses = deriveWalletAddresses(mnemonic24, legacyPhrase);
+  const addresses = deriveWalletAddresses(mnemonic24, legacyPhrase, bip39Passphrase);
 
   return {
     privateKeyBlock: keyBodyB64,
