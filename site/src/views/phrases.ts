@@ -6,11 +6,12 @@
 
 import {
   bchatChatId,
-  beldexAddressFromLegacy,
+  beldexAddressesFromLegacy,
+  buildMoneroReport,
   decodeLegacyMnemonic,
   encodeLegacyMnemonic,
   mnemonic24FromSeed,
-  moneroAddressFromLegacy,
+  moneroAddressesFromLegacy,
   scReduce32,
   seedFromMnemonic,
 } from 'meltify-ts';
@@ -22,6 +23,11 @@ import type { Ctx } from '../app-types.ts';
 interface Panel {
   root: HTMLElement;
   run(): void;
+}
+
+/** One `0,n address` line per subaddress, as meltify-monero prints them. */
+function subaddressText(subaddresses: readonly string[]): string {
+  return subaddresses.map((address, index) => `0,${index + 1} ${address}`).join('\n');
 }
 
 function seedPanel(): Panel {
@@ -46,12 +52,25 @@ function seedPanel(): Panel {
     }
     const mnemonic = mnemonic24FromSeed(seed);
     const reduced = scReduce32(seed);
+    const monero = buildMoneroReport({ seed });
     output.replaceChildren(
       valueBlock('melt phrase', mnemonic, { secret: true, note: '24 words, BIP39' }),
       valueBlock('sc-reduced seed', toHex(reduced), { secret: true, note: 'hex, fed to CryptoNote' }),
       valueBlock('cryptonote phrase', encodeLegacyMnemonic(reduced), {
         secret: true,
         note: '25 words',
+      }),
+      valueBlock('monero primary', monero.monero.primary, { note: 'from the 25-word seed' }),
+      valueBlock('monero subaddresses', subaddressText(monero.monero.subaddresses), {
+        note: `0,1-0,${monero.monero.subaddresses.length}`,
+      }),
+      valueBlock('cake wallet seed', monero.cakePhrase, {
+        secret: true,
+        note: '25 words, Unstoppable shows this phrase',
+      }),
+      valueBlock('cake monero primary', monero.cake.primary, { note: 'm/44\'/128\'/0\'/0/0' }),
+      valueBlock('cake monero subaddresses', subaddressText(monero.cake.subaddresses), {
+        note: `0,1-0,${monero.cake.subaddresses.length}`,
       }),
     );
   };
@@ -121,10 +140,18 @@ function legacyPanel(): Panel {
     }
     try {
       const reduced = decodeLegacyMnemonic(phrase);
+      const monero = moneroAddressesFromLegacy(phrase);
+      const beldex = beldexAddressesFromLegacy(phrase);
       output.replaceChildren(
         valueBlock('decoded seed', toHex(reduced), { secret: true, note: 'hex, 32 bytes' }),
-        valueBlock('monero primary', moneroAddressFromLegacy(phrase)),
-        valueBlock('beldex primary', beldexAddressFromLegacy(phrase)),
+        valueBlock('monero primary', monero.primary),
+        valueBlock('monero subaddresses', subaddressText(monero.subaddresses), {
+          note: `0,1-0,${monero.subaddresses.length}`,
+        }),
+        valueBlock('beldex primary', beldex.primary),
+        valueBlock('beldex subaddresses', subaddressText(beldex.subaddresses), {
+          note: `0,1-0,${beldex.subaddresses.length}`,
+        }),
         valueBlock('bchat chat id', bchatChatId(reduced)),
         valueBlock('re-encoded phrase', encodeLegacyMnemonic(reduced), {
           secret: true,
@@ -144,7 +171,7 @@ function legacyPanel(): Panel {
   input.addEventListener('input', run);
   const root = el('section', { class: 'card' }, [
     el('h2', {}, ['CryptoNote phrase → addresses']),
-    hint('25 words. Only primaries are derived; subaddresses are out of scope for meltify-info parity.'),
+    hint('25 words. Prints the primaries and subaddresses 0,1-0,9 for Monero and Beldex.'),
     el('div', { style: 'margin-top: 12px' }, [input]),
     output,
   ]);

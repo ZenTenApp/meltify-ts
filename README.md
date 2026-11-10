@@ -27,6 +27,7 @@ runs in Node or a browser bundle.
 | M5 | Structured report + byte-compatible text renderer | done |
 | M6 | `--subaccount` wired end-to-end | done (core + site) |
 | M7 | Differential CI against the Go binary | not started |
+| M8 | Monero subaddresses + Unstoppable/Cake section (`meltify-monero` parity) | done (core + site) |
 
 ## Usage
 
@@ -65,7 +66,34 @@ console.log(renderText(sub.report, { color: false })); // sub.report, sub.seed, 
 Lower-level pieces are exported too: `mnemonic24FromSeed`, `nostrKeysFromMnemonic`,
 `deriveWalletAddresses`, `encodeLegacyMnemonic` / `decodeLegacyMnemonic`, `scReduce32`,
 `bchatChatId`, `moneroAddressFromLegacy`, `beldexAddressFromLegacy`,
-`deriveSubaccountSeed`, and the OpenSSH marshaller used for subaccounts.
+`moneroAddressesFromLegacy` / `beldexAddressesFromLegacy` (primary + subaddresses),
+`cakeSpendKeyFromMnemonic` / `cakeLegacyPhraseFromMnemonic`, `deriveSubaccountSeed`, and the
+OpenSSH marshaller used for subaccounts.
+
+### Monero output (`meltify-monero` parity)
+
+`buildMoneroReport` + `renderMoneroText` reproduce the sibling `meltify-monero` binary: the
+CryptoNote legacy section (25-word seed, primary address, subaddresses `0,1`…`0,9`) and the
+Unstoppable/Cake section (the 24-word MELT phrase, the 25-word seed Cake Wallet/Unstoppable
+display for it, and the `4…` addresses from that seed).
+
+```ts
+import { buildMoneroReport, renderMoneroText } from 'meltify-ts';
+
+// `seed` is the source key's seed, or a subaccount seed from deriveSubaccountSeed.
+const monero = buildMoneroReport({ seed: parsed.seed });
+console.log(renderMoneroText(monero, { color: false }));
+
+monero.monero.subaddresses; // ['89JZ…', …] (0,1)…(0,9)
+monero.cakePhrase;          // 25-word Cake/Feather seed
+monero.beldex;              // same keys, Beldex primaries + subaddresses
+```
+
+`subaddressCount` overrides the 9 subaddresses per section. The Cake spend key comes from
+BIP39 → `m/44'/128'/account'/0/0` reduced mod `l` with no Keccak, so the printed 25-word seed is
+what Unstoppable shows for the MELT phrase — not the CryptoNote legacy seed printed above it.
+The report also carries the Beldex primary address and its subaddresses, the way
+`meltify-beldex` prints them; `renderMoneroText` prints Monero only, matching `meltify-monero`.
 
 ### Error behavior
 
@@ -86,7 +114,11 @@ Derivations are locked by golden vectors copied from the Go repo
 - 24-word MELT phrase, npub/nsec/hex, and all 14 chain derivations
   (BTC, BCH, ETH+EIP-55, SOL, TRX, LTC, DOGE, ATOM, XRP, XLM, SUI, SP, TON, XMR, BDX)
 - 25-word CryptoNote phrase encode/decode and `scReduce32`
-- Monero and Beldex legacy primaries
+- Monero and Beldex legacy primaries, their `(0,1)` subaddresses, and the Cake Wallet
+  spend key / 25-word seed / primary / `(0,1)` subaddress
+- The full `meltify-monero` terminal text: `test/golden/monero-reference.txt` is the output of
+  the built Go binary under `NO_COLOR=1` for seed `00..1f`, and `renderMoneroText` is diffed
+  against it byte for byte rather than against its own snapshot
 
 Independent checks beyond the upstream goldens:
 
@@ -105,9 +137,11 @@ Independent checks beyond the upstream goldens:
 src/core/                 isomorphic (no Node built-ins)
   ssh/{parse,marshal,wire}.ts   openssh-key-v1 container, bcrypt_pbkdf, AES-256-CTR
   crypto/{bcrypt-pbkdf,crc}.ts  vendored/adapted primitives
-  derive/                       BIP39, SLIP-0010, NIP-06, chains, TON, CryptoNote
+  derive/                       BIP39, SLIP-0010, NIP-06, chains, TON, CryptoNote, Cake
   report.ts                     structured IdentityReport
+  monero-report.ts              structured MoneroReport (meltify-monero)
 src/render/text.ts        terminal renderer (plain + ANSI)
+src/render/monero-text.ts meltify-monero renderer (divider, subaddress blocks)
 test/                     vitest suites, golden vectors, ssh-keygen fixtures
 examples/browser-demo/    click-through demo page (esbuild bundle + node:http server)
 site/                     production front end → static artifact in site/dist/
@@ -166,9 +200,9 @@ written by semantic-release, so do not edit either by hand.
 - **Color output** approximates meltify's truecolor palette; ANSI byte-parity is not
   claimed. Plain (`NO_COLOR`) output is the parity target.
 - **`man` / `completion` subcommands** are omitted; not relevant to the core.
-- **Subaddresses** are not derived: `meltify-info` only prints Monero/Beldex primaries.
-  The CryptoNote codec is structured so subaddress derivation can be added for the other
-  sibling binaries later.
+- **Subaddresses** are derived by `moneroAddressesFromLegacy` / `beldexAddressesFromLegacy` and
+  printed by `renderMoneroText`; `meltify-info`'s own output still lists only the primaries, so
+  `renderText` is unchanged.
 - **`--subaccount`** is exposed by the library and the site:
   `deriveSubaccountSeed(seed, label)` is the pure derivation, and
   `buildSubaccountReport({ seed, label, passphrase })` returns the report with the

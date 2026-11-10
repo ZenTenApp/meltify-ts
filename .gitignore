@@ -1,4 +1,5 @@
 .pi/
+.piso/
 node_modules/
 dist/
 coverage/

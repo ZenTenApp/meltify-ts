@@ -75,7 +75,14 @@ if (process.argv.includes('--build') || !(await exists(join(dist, 'index.html'))
 }
 
 const server = createServer(async (request, response) => {
-  const url = new URL(request.url ?? '/', `http://${request.headers.host ?? host}`);
+  let url;
+  try {
+    // A protocol-relative path such as `//` throws ERR_INVALID_URL; answer it, don't crash.
+    url = new URL(request.url ?? '/', `http://${request.headers.host ?? host}`);
+  } catch {
+    response.writeHead(400, { 'content-type': 'text/plain' }).end('bad request');
+    return;
+  }
 
   if (url.pathname === '/healthz') {
     response.writeHead(200, { 'content-type': 'text/plain' }).end('ok');

@@ -39,11 +39,11 @@ and `.htaccess`.
 
 | Tab | Feature |
 | --- | --- |
-| Derive | File drop or paste, passphrase, optional subaccount label, throwaway key (pinned seed `00..1f` or random) |
+| Derive | File drop or paste, passphrase, required subaccount label, throwaway key (pinned seed `00..1f` or random; its fixed `test-passphrase` is filled in and shown) |
 | Report | Secret + public blocks, per-field reveal, public/full JSON export, subaccount key download, wipe |
-| Chains | 30 labeled addresses grouped by family, filter, CSV export |
+| Chains | 30 labeled addresses grouped by family, plus the Monero subaddresses and Cake/Unstoppable rows from `buildMoneroReport`; filter, CSV export |
 | meltify-info | `renderText` output in meltify-info's own colours, `.txt` download (plain form is the parity target) |
-| Phrase lab | seed → MELT/CryptoNote phrase, phrase → BIP39 seed, 25-word phrase → Monero/Beldex/BChat |
+| Phrase lab | seed → MELT/CryptoNote phrase plus the `meltify-monero` section (Monero primary + subaddresses 0,1–0,9, Cake/Unstoppable seed and its addresses), phrase → BIP39 seed, 25-word phrase → Monero/Beldex primaries and subaddresses + BChat |
 | Key tools | Marshal a new password-protected key (rounds 1 or 16) and hand it to Derive |
 | Self-check | Re-runs the pinned Go vectors against the loaded bundle |
 
@@ -58,12 +58,15 @@ and `.htaccess`.
 - **Masking is cosmetic and per field.** Seed, phrase, nsec, and the private-key
   body each carry their own reveal button on the Report tab, but they are plain
   strings in memory — same caveat as the terminal tool.
-- **Subaccounts are a label on Derive, not a tab.** Filling in the subaccount
-  label derives the child identity in the same worker call and re-encodes the key
-  with the same passphrase at bcrypt rounds 1, exactly like `meltify-info
-  --subaccount`. Every other tab then shows the subaccount's identity, the
-  Report footer names the label, and the Report export offers the re-encoded
-  subaccount key. An empty label is the source key. The label itself is not
+- **Subaccounts are a label on Derive, not a tab.** The label is required:
+  Derive stays disabled, with a “A subaccount label is required” tooltip, until
+  it is filled, and *Try a throwaway key* fills in `my-throwaway-subaccount`.
+  Filling it derives the child identity in the same worker call and re-encodes
+  the key with the same passphrase at bcrypt rounds 1, exactly like
+  `meltify-info --subaccount`. Every other tab then shows the subaccount's
+  identity, the Report footer names the label, and the Report export offers the
+  re-encoded subaccount key. The library still treats an empty label as the
+  source key — the site is what refuses to derive one. The label itself is not
   secret, and it is the only thing that has to be remembered to get the
   subaccount back.
 - **Colour means secrecy.** A `valueBlock` marked `secret` paints red, matching

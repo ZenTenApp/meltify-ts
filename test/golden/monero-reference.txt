@@ -1,0 +1,52 @@
+
+=====BEGIN 25-WORD MONERO LEGACY SEED=====
+tossed mural diplomat jump peaches gearbox yoga hyper sphere biscuit rated powder upcoming vacation zigzags boxes ornament renting glass gained island bemused alarms bakery ornament
+=====END 25-WORD MONERO LEGACY SEED=====
+
+
+-----BEGIN MONERO PRIMARY ADDRESS-----
+49HjJN4ZbLjDFqe3Mus7mPZBE6Q27cRGtPLfyuNejGdYZhvke36zj1xGq5kDCbSCXbc5TLTR7vygzVDYTcgFURLaLe4Gdds
+-----END MONERO PRIMARY ADDRESS-----
+
+
+----- MONERO ADDRESSES FROM 25-WORD LEGACY SEED -----
+subaddress 0,1 89JZu9GXu4zavCrprHJBhqe93rCDYAXGS75C8qoi1DKuKQwCfbZMM3tHxwH5H7Mx5ZaTPoHrEcTBEXyKiHYt47L6Q8ar72s
+subaddress 0,2 83muZoXBK3M1VwQcS5NJRBA7SPJkLBwFHXh6ntBwZZaVPQ4T595mHWNQmVVShyWjKBKKum5AuXGV4F7TCQf4VhW337mBByJ
+subaddress 0,3 8BaNoVgozxQ6uk7jNALoJ5QVD7QHC3CBb66V5689etvdiwQVpRuqZg5JAW5Cx3yqGAbVnQ21X4Hzoh2qaMNZEjA6Ukco2sY
+subaddress 0,4 844vfHNDjZCdYD21K89GYVWzPBoSASxzm227e59ZSf6GaEwyzcPsMGMGN7UKHesFvzhhtcpJoBjkLXwQ6cX1ZeSK5zM7i8v
+subaddress 0,5 88adX4bN1TtA4MrTf3s8TZdu4RkrUCksHBCgoE7QJnmAVxuNe31GUhfagozBpZpGd7eestL7BpL1mTi23TMZhbsqEmGXSjk
+subaddress 0,6 86D4DinMe6SUfSZTWCptf3Ypxr1BJiV4x1u93d4KnUya2D1YoSC1R88G8G5QC1SdqCCJC4M8K37VYc1PSnafaS3PJL26KAo
+subaddress 0,7 832hChBiSUqKVXRoggu7Pm2H2YVTzun8J861bFfchsF9cqB5gh5fQ7E2iGTxQb2X2fLSetCcqCJkRiJsFeafbtKe1gaY8nY
+subaddress 0,8 88VuPCaJpjvf4n5AdbNgbhP3ksViRvT4MFpLyxQmmYQ1h8yRXC8SRJ5Ya6mKvoMnL2YjrDMQX2dKs9nenwQ9vL6KUrCBu4Y
+subaddress 0,9 85aSbakqxDBHGNcowJaW7jVPusUgqhFJgfZctHAaGAPc266mSWQnVQoH8d4hQoXzsMhD8oKnLVS8hbVd1zz1TcQdANNDRKk
+----- MONERO ADDRESSES FROM 25-WORD LEGACY SEED -----
+
+
+**************************************************************************************************************
+**************************************************************************************************************
+
+=====BEGIN MONERO (Unstoppable) 24-WORD SEED =====
+abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware
+=====BEGIN MONERO (Cake, Feather) 25-WORD SEED=====
+autumn cunning eternal when delayed cause soil educated apex budget cake olympics utility soprano tilt unhappy liar cunning richly gleeful tiers rays vixen aces cunning
+=====END MONERO LEGACY SEED=====
+
+
+-----BEGIN MONERO PRIMARY ADDRESS (CAKE WALLET)-----
+46DNbqv4kL5PP3i89Y2NJYSxMkDtFHZPpj4nEda1MRFC4kTHeywyxPj63zRav6ESWjUsF1qYHNu8rRzbGsbGcCGwT5bCHEo
+-----END MONERO PRIMARY ADDRESS (CAKE WALLET)-----
+
+
+----- MONERO ADDRESSES FROM CAKE WALLET 25-WORD SEED -----
+subaddress 0,1 86mTNi3FWyoDxtGvwuLJkFAEFpKauzHVo9e3Aha8uyxfjkVgo3oCYzhFYYTibgjigfK4PjN3yHPFQVcy3cQRPexbTiMtU7X
+subaddress 0,2 88aQjcURK1pc3L8UsmTXgJGUWgRGYSf7v3EWMtJXc5n69CkpAWmUwRT3Cim2boxRLcWwp5Ttb8pYPevDUN12A38kJ1euJse
+subaddress 0,3 883mQZD9K7aX6XCfwp71BnifQGDzjaYXZ5qqnJiDcXmnia5yfwfQ2SN9MkKFMPqnvwEn7SAfj3psZQ1ce9sLBgELJzwJ6ib
+subaddress 0,4 88pjU2Jb4gxd4RX1jdErTeFFxSrAcbA5ABAanM7nqLED6MRkaCWATZH17B2QV4sWFe6j3WZqzSqCBM1pj5qTwGSgKszMJ29
+subaddress 0,5 89H131MajnmRJ79h8KnAwGHTSpdCyo2bt5aKH9oTdVEifNFRXBq9CiXCnzvwBoDXxeMRxDCz8qYdrZocG1zRkvfXJLLAeyF
+subaddress 0,6 8BdtZh4fNu7FvVAJasErCLQf9CTPQPe7YJN1KrzLLL34caWo5L67icDMeExDVRL5NYM6fmhWaJiJS1sRtAdq2gwgA6wUDC2
+subaddress 0,7 883Y3SVJiXN5khLzJwFQWmBHgN56af8xK5H9bg4exCznPfK5yuReT3496NrDbHUP1cA61vgXnmhQM8RQTNAjZdceQ5sXvKy
+subaddress 0,8 89uznu9Z1UwJEEkYLUPtSrH7PwrCVnsFqay47NWYxqfUEfhMB8nqgTYHvpb1kmEbAvAAA8kUqKkjuTi5AK8zuMKhTMtJtqW
+subaddress 0,9 8B5B2KxbiAT4VuHaoZ1EUQZCk6uHTGPTP1UzQ3ZHuUqFaKHBMfHEyYdheavhSgZmEnU6kZctLK65eD42Jp5ZmKa4UctD4ku
+----- MONERO ADDRESSES FROM CAKE WALLET 25-WORD SEED -----
+
+

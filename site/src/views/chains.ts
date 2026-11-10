@@ -3,9 +3,11 @@
  * filterable, with CSV export.
  */
 
+import { buildMoneroReport } from 'meltify-ts';
 import { copyAction } from '../lib/blocks.ts';
 import { downloadText } from '../lib/download.ts';
 import { el, hint, pill, toast } from '../lib/dom.ts';
+import { parseHex } from '../lib/hex.ts';
 import { subscribe, type AppState } from '../lib/store.ts';
 import type { Ctx } from '../app-types.ts';
 
@@ -47,8 +49,50 @@ const GROUPS: readonly { title: string; labels: readonly string[] }[] = [
   { title: 'Beldex · CryptoNote legacy phrase', labels: ['beldex'] },
 ];
 
-function csvOf(rows: readonly { label: string; address: string }[]): string {
-  return `label,address\n${rows.map((row) => `${row.label},${row.address}`).join('\n')}\n`;
+interface AddressRow {
+  label: string;
+  address: string;
+}
+
+interface AddressGroup {
+  title: string;
+  rows: readonly AddressRow[];
+}
+
+/**
+ * The Monero outputs meltify-info does not list: the `(0, n)` subaddresses of the
+ * legacy phrase and the whole Cake Wallet / Unstoppable set. Derived here on the
+ * main thread from the report's seed — the worker payload stays meltify-info's.
+ */
+function moneroGroups(seedHex: string): AddressGroup[] {
+  const seed = parseHex(seedHex);
+  if (seed === null || seed.length !== 32) return [];
+  const monero = buildMoneroReport({ seed });
+  const subaddressRows = (subaddresses: readonly string[], prefix: string): AddressRow[] =>
+    subaddresses.map((address, index) => ({ label: `${prefix} (0,${index + 1})`, address }));
+
+  return [
+    {
+      title: 'Monero · subaddresses from the 25-word legacy seed',
+      rows: subaddressRows(monero.monero.subaddresses, 'monero'),
+    },
+    {
+      title: "Monero · Cake/Unstoppable (BIP39 m/44'/128'/0'/0/0)",
+      rows: [
+        { label: 'monero cake', address: monero.cake.primary },
+        ...subaddressRows(monero.cake.subaddresses, 'monero cake'),
+      ],
+    },
+  ];
+}
+
+/** CSV-quote a field when it could otherwise break the row. */
+function csvField(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+function csvOf(rows: readonly AddressRow[]): string {
+  return `label,address\n${rows.map((row) => `${csvField(row.label)},${csvField(row.address)}`).join('\n')}\n`;
 }
 
 export function mountChains(_ctx: Ctx): HTMLElement {
@@ -72,6 +116,18 @@ export function mountChains(_ctx: Ctx): HTMLElement {
     }
 
     const addresses = identity.report.addresses;
+    // meltify-info's 30 labels first, then the meltify-monero outputs.
+    const groups: AddressGroup[] = [
+      ...GROUPS.map((group) => ({
+        title: group.title,
+        rows: group.labels
+          .map((label) => addresses.find((entry) => entry.label === label))
+          .filter((entry): entry is AddressRow => entry !== undefined),
+      })),
+      ...moneroGroups(identity.report.seedHex),
+    ];
+    const allRows = groups.flatMap((group) => group.rows);
+    const extraRows = allRows.length - addresses.length;
     const filter = el('input', {
       type: 'text',
       placeholder: 'filter by label or address',
@@ -84,16 +140,13 @@ export function mountChains(_ctx: Ctx): HTMLElement {
       const rows: HTMLElement[] = [];
       let shown = 0;
 
-      for (const group of GROUPS) {
-        const members = group.labels
-          .map((label) => addresses.find((entry) => entry.label === label))
-          .filter((entry): entry is { label: string; address: string } => entry !== undefined)
-          .filter(
-            (entry) =>
-              needle === '' ||
-              entry.label.includes(needle) ||
-              entry.address.toLowerCase().includes(needle),
-          );
+      for (const group of groups) {
+        const members = group.rows.filter(
+          (entry) =>
+            needle === '' ||
+            entry.label.includes(needle) ||
+            entry.address.toLowerCase().includes(needle),
+        );
         if (members.length === 0) continue;
 
         rows.push(
@@ -117,7 +170,7 @@ export function mountChains(_ctx: Ctx): HTMLElement {
         rows.push(el('tr', {}, [el('td', { colspan: 3, class: 'name' }, ['no matches'])]));
       }
       body.replaceChildren(...rows);
-      counter.textContent = `${shown} of ${addresses.length} shown`;
+      counter.textContent = `${shown} of ${allRows.length} shown`;
     };
 
     filter.addEventListener('input', draw);
@@ -144,15 +197,15 @@ export function mountChains(_ctx: Ctx): HTMLElement {
             type: 'button',
             class: 'btn small',
             onclick: () => {
-              downloadText('meltify-addresses.csv', csvOf(addresses), 'text/csv;charset=utf-8');
+              downloadText('meltify-addresses.csv', csvOf(allRows), 'text/csv;charset=utf-8');
               toast('CSV downloaded');
             },
           }, ['download CSV']),
-          copyAction(csvOf(addresses), 'address CSV', 'copy CSV'),
+          copyAction(csvOf(allRows), 'address CSV', 'copy CSV'),
         ]),
       ]),
       hint(
-        'Order and labels match meltify-info exactly. Monero and Beldex come from the 25-word CryptoNote phrase derived from the sc-reduced seed; every EVM label shares one address.',
+        'Order and labels match meltify-info exactly. Monero and Beldex come from the 25-word CryptoNote phrase derived from the sc-reduced seed; every EVM label shares one address. Below the 30 labels: the Monero subaddresses and the Cake/Unstoppable set meltify-monero prints, derived from the same seed.',
       ),
       el('div', { class: 'row tight', style: 'margin-top: 12px' }, [filter, counter]),
       el('div', { style: 'margin-top: 12px' }, [table]),
@@ -160,6 +213,7 @@ export function mountChains(_ctx: Ctx): HTMLElement {
         pill(`${addresses.length} labels`),
         pill('14 derivations'),
         pill('11 families'),
+        ...(extraRows === 0 ? [] : [pill(`+${extraRows} monero rows`)]),
       ]),
     ]);
 

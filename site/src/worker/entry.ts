@@ -19,6 +19,7 @@ import {
 } from 'meltify-ts';
 import { GOLDEN, GOLDEN_SEED_00_TO_1F, SUBACCOUNT_GOLDEN } from '../../../test/golden/goldens.ts';
 import { parseHex, toHex } from '../lib/hex.ts';
+import { THROWAWAY_PASSPHRASE } from '../lib/throwaway.ts';
 import type {
   CheckRow,
   SerializedError,
@@ -26,8 +27,6 @@ import type {
   WorkerResponse,
   WorkerResult,
 } from './protocol.ts';
-
-const THROWAWAY_PASSPHRASE = 'test-passphrase';
 
 const scope = self as unknown as {
   onmessage: ((event: MessageEvent<WorkerRequest>) => void) | null;

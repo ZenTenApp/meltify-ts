@@ -34,6 +34,14 @@ export const GOLDEN = {
   beldexLegacyPrimary: 'bxdX8BhX3i3bqdxkyw9Ph2Ls3C1sCXvQaWhBcQTZ2FfbHgqNBWHYS22FcbXP23wp7NewRx9JuSNHdSNHMHuUo3rv14ptKXWMH',
   beldexLegacySub0: 'LXCLvss2tsGavCrprHJBhqe93rCDYAXGS75C8qoi1DKuKQwCfbZMM3tHxwH5H7Mx5ZaTPoHrEcTBEXyKiHYt47L6QD5WBxA',
 
+  // Cake Wallet / Unstoppable BIP39 conversion of mnemonic24 (account 0):
+  // spend key from m/44'/128'/0'/0/0 reduced mod l with no Keccak, the 25-word
+  // phrase it encodes, and the Monero primary + first subaddress from that phrase.
+  cakeSpendKeyHex: '957e481803fc73f4876b58d112579c77a6ad010eaff103af49405e83ad5ef40f',
+  cake25: 'autumn cunning eternal when delayed cause soil educated apex budget cake olympics utility soprano tilt unhappy liar cunning richly gleeful tiers rays vixen aces cunning',
+  cakePrimary: '46DNbqv4kL5PP3i89Y2NJYSxMkDtFHZPpj4nEda1MRFC4kTHeywyxPj63zRav6ESWjUsF1qYHNu8rRzbGsbGcCGwT5bCHEo',
+  cakeSub0: '86mTNi3FWyoDxtGvwuLJkFAEFpKauzHVo9e3Aha8uyxfjkVgo3oCYzhFYYTibgjigfK4PjN3yHPFQVcy3cQRPexbTiMtU7X',
+
   // Independently computed for seed 00..1f (standard Ed25519 public key of the
   // sc-reduced seed -> Montgomery u, tagged 0xBD). The Go test derives this from
   // its own implementation, so it is not an independent pin upstream.
