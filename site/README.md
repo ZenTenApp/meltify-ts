@@ -39,7 +39,7 @@ and `.htaccess`.
 
 | Tab | Feature |
 | --- | --- |
-| Derive | File drop or paste, passphrase, required subaccount label, throwaway key (pinned seed `00..1f` or random; its fixed `test-passphrase` is filled in and shown) |
+| Derive | File drop or paste, passphrase, required subaccount label, required BIP39 passphrase, throwaway key (pinned seed `00..1f` or random; its fixed `test-passphrase` and `test-bip39-passphrase` are filled in and shown) |
 | Report | Secret + public blocks, per-field reveal, public/full JSON export, subaccount key download, wipe |
 | Chains | 30 labeled addresses grouped by family, plus the Monero subaddresses and Cake/Unstoppable rows from `buildMoneroReport`; filter, CSV export |
 | meltify-info | `renderText` output in meltify-info's own colours, `.txt` download (plain form is the parity target) |
@@ -69,6 +69,16 @@ and `.htaccess`.
   source key — the site is what refuses to derive one. The label itself is not
   secret, and it is the only thing that has to be remembered to get the
   subaccount back.
+- **The BIP39 passphrase is required, like the subaccount label.** Derive stays
+  disabled until both are filled, with a tooltip naming the missing one; *Try a
+  throwaway key* fills `test-bip39-passphrase`. The passphrase is fed to the
+  PBKDF2 step in `buildIdentityReport({ bip39Passphrase })`, so it moves the
+  Nostr keys and the 28 BIP39-seeded address rows and leaves the seed, the
+  phrases, the SSH key, Monero and Beldex alone. Two consequences are stated in
+  the UI rather than hidden: `meltify-info` has no equivalent flag, so the
+  copied command reproduces the key but not the addresses, and the public JSON
+  export marks the passphrase `[set — not exported]` while the full export
+  includes it, because the addresses cannot be reproduced without it.
 - **Colour means secrecy.** A `valueBlock` marked `secret` paints red, matching
   the binary's private-value colour; anything unmasked is green. The
   meltify-info tab reuses `renderText({ color: true })` and converts its SGR
@@ -145,6 +155,6 @@ module workers, the symlink-free fix is to keep `assets/` intact and confirm
 
 `npm run verify` includes `site:typecheck`. Beyond that, the build was checked
 by booting the bundle in jsdom (7 views mount, worker URL resolves) and by
-running the built worker bundle against the golden seed: 31/32 self-check rows
-pass, the 32nd ("no Buffer global") is browser-only and fails under Node by
+running the built worker bundle against the golden seed: 46/47 self-check rows
+pass, the 47th ("no Buffer global") is browser-only and fails under Node by
 design.

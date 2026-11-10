@@ -20,42 +20,48 @@ export interface LabeledAddress {
 /**
  * Derives all 30 `label:address` rows. EVM aliases reuse the Ethereum address;
  * Monero and Beldex come from the 25-word CryptoNote legacy phrase.
+ *
+ * `bip39Passphrase` feeds the mnemonic -> BIP39 seed step, so it moves every
+ * chain address here except Monero and Beldex, which never touch a BIP39 seed.
+ * The default (empty string) is the standard "no 25th word" derivation and is
+ * what `meltify-info` always uses.
  */
 export function deriveWalletAddresses(
   mnemonic: string,
   legacyPhrase: string,
+  bip39Passphrase = '',
 ): LabeledAddress[] {
-  const eth = ethereumAddress(mnemonic);
+  const eth = ethereumAddress(mnemonic, bip39Passphrase);
   return [
     { label: 'arbitrum', address: eth },
     { label: 'arc', address: eth },
     { label: 'avalanche', address: eth },
     { label: 'base', address: eth },
     { label: 'beldex', address: beldexAddressFromLegacy(legacyPhrase) },
-    { label: 'bitcoin', address: bitcoinNativeSegwit(mnemonic) },
-    { label: 'bitcoincash', address: bitcoinCash(mnemonic) },
+    { label: 'bitcoin', address: bitcoinNativeSegwit(mnemonic, bip39Passphrase) },
+    { label: 'bitcoincash', address: bitcoinCash(mnemonic, bip39Passphrase) },
     { label: 'bnbchain', address: eth },
     { label: 'celo', address: eth },
-    { label: 'cosmos', address: cosmos(mnemonic) },
+    { label: 'cosmos', address: cosmos(mnemonic, bip39Passphrase) },
     { label: 'cronos', address: eth },
-    { label: 'dogecoin', address: dogecoin(mnemonic) },
+    { label: 'dogecoin', address: dogecoin(mnemonic, bip39Passphrase) },
     { label: 'ethereum', address: eth },
     { label: 'gnosis', address: eth },
     { label: 'hyperevm', address: eth },
-    { label: 'litecoin', address: litecoin(mnemonic) },
+    { label: 'litecoin', address: litecoin(mnemonic, bip39Passphrase) },
     { label: 'monad', address: eth },
     { label: 'monero', address: moneroAddressFromLegacy(legacyPhrase) },
     { label: 'optimism', address: eth },
     { label: 'plasma', address: eth },
     { label: 'polygon', address: eth },
-    { label: 'silentpayment', address: silentPayment(mnemonic) },
-    { label: 'solana', address: solana(mnemonic) },
+    { label: 'silentpayment', address: silentPayment(mnemonic, bip39Passphrase) },
+    { label: 'solana', address: solana(mnemonic, bip39Passphrase) },
     { label: 'stablechain', address: eth },
-    { label: 'stellar', address: stellar(mnemonic) },
-    { label: 'sui', address: sui(mnemonic) },
-    { label: 'ton', address: ton(mnemonic) },
-    { label: 'tron', address: tronAddress(mnemonic) },
+    { label: 'stellar', address: stellar(mnemonic, bip39Passphrase) },
+    { label: 'sui', address: sui(mnemonic, bip39Passphrase) },
+    { label: 'ton', address: ton(mnemonic, bip39Passphrase) },
+    { label: 'tron', address: tronAddress(mnemonic, bip39Passphrase) },
     { label: 'worldchain', address: eth },
-    { label: 'xrpl', address: ripple(mnemonic) },
+    { label: 'xrpl', address: ripple(mnemonic, bip39Passphrase) },
   ];
 }

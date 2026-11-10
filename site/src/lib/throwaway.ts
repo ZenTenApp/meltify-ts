@@ -8,3 +8,15 @@
  * from here.
  */
 export const THROWAWAY_PASSPHRASE = 'test-passphrase';
+
+/**
+ * The BIP39 passphrase filled in for throwaway runs.
+ *
+ * Derive requires a BIP39 passphrase like it requires a subaccount label, so the
+ * throwaway flow has to supply one. It is public and fixed for the same reasons
+ * as the key passphrase above: it protects nothing, and the button's job is to
+ * show a working example of the real form. It is not empty on purpose — the
+ * pinned throwaway identity is then a passphrase run, matching what the site
+ * actually asks of users.
+ */
+export const THROWAWAY_BIP39_PASSPHRASE = 'test-bip39-passphrase';

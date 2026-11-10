@@ -16,10 +16,11 @@ import {
   parseEncryptedOpenSSHKey,
   renderText,
   scReduce32,
+  type IdentityReport,
 } from 'meltify-ts';
 import { GOLDEN, GOLDEN_SEED_00_TO_1F, SUBACCOUNT_GOLDEN } from '../../../test/golden/goldens.ts';
 import { parseHex, toHex } from '../lib/hex.ts';
-import { THROWAWAY_PASSPHRASE } from '../lib/throwaway.ts';
+import { THROWAWAY_BIP39_PASSPHRASE, THROWAWAY_PASSPHRASE } from '../lib/throwaway.ts';
 import type {
   CheckRow,
   SerializedError,
@@ -50,12 +51,17 @@ function run(request: WorkerRequest): WorkerResult {
       const parsed = parseEncryptedOpenSSHKey(request.pem, request.passphrase);
       const label = request.subaccount ?? '';
       if (label === '') {
-        const report = buildIdentityReport({ seed: parsed.seed, keyBodyB64: parsed.keyBodyB64 });
+        const report = buildIdentityReport({
+          seed: parsed.seed,
+          keyBodyB64: parsed.keyBodyB64,
+          bip39Passphrase: request.bip39Passphrase,
+        });
         return {
           op: 'derive',
           report,
           seedHex: toHex(parsed.seed),
           subaccount: '',
+          bip39Passphrase: request.bip39Passphrase,
           elapsedMs: performance.now() - started,
         };
       }
@@ -65,12 +71,14 @@ function run(request: WorkerRequest): WorkerResult {
         seed: parsed.seed,
         label,
         passphrase: request.passphrase,
+        bip39Passphrase: request.bip39Passphrase,
       });
       return {
         op: 'derive',
         report: sub.report,
         seedHex: toHex(sub.seed),
         subaccount: label,
+        bip39Passphrase: request.bip39Passphrase,
         pem: sub.pem,
         elapsedMs: performance.now() - started,
       };
@@ -84,13 +92,18 @@ function run(request: WorkerRequest): WorkerResult {
       const parsed = parseEncryptedOpenSSHKey(key.pem, request.passphrase);
       const label = request.subaccount ?? '';
       if (label === '') {
-        const report = buildIdentityReport({ seed: parsed.seed, keyBodyB64: parsed.keyBodyB64 });
+        const report = buildIdentityReport({
+          seed: parsed.seed,
+          keyBodyB64: parsed.keyBodyB64,
+          bip39Passphrase: request.bip39Passphrase,
+        });
         return {
           op: 'throwaway',
           report,
           seedHex: toHex(parsed.seed),
           pem: key.pem,
           subaccount: '',
+          bip39Passphrase: request.bip39Passphrase,
           elapsedMs: performance.now() - started,
         };
       }
@@ -98,6 +111,7 @@ function run(request: WorkerRequest): WorkerResult {
         seed: parsed.seed,
         label,
         passphrase: request.passphrase,
+        bip39Passphrase: request.bip39Passphrase,
       });
       return {
         op: 'throwaway',
@@ -105,6 +119,7 @@ function run(request: WorkerRequest): WorkerResult {
         seedHex: toHex(sub.seed),
         pem: key.pem,
         subaccount: label,
+        bip39Passphrase: request.bip39Passphrase,
         elapsedMs: performance.now() - started,
       };
     }
@@ -171,6 +186,8 @@ function selfCheck(): WorkerResult {
 
     const byLabel = (label: string): string | undefined =>
       report.addresses.find((entry) => entry.label === label)?.address;
+    const addressIn = (source: IdentityReport, label: string): string | undefined =>
+      source.addresses.find((entry) => entry.label === label)?.address;
     const pinned: Record<string, string> = {
       bitcoin: GOLDEN.bitcoin,
       bitcoincash: GOLDEN.bitcoincash,
@@ -207,6 +224,55 @@ function selfCheck(): WorkerResult {
     check('beldex differs from monero', byLabel('beldex') !== byLabel('monero'), true);
     check('bchat chat id', report.bchat, GOLDEN.bchat);
     check('renderText line count', renderText(report).split('\n').length, 72);
+
+    // BIP39 passphrase path (the site requires one). Nothing in the Go vectors
+    // covers it — meltify-info has no such flag — so these rows pin the two
+    // things that matter: the passphrase moves the BIP39-seeded values, and it
+    // leaves the seed, the phrases, the SSH key and the CryptoNote rows alone.
+    const withPassphrase = buildIdentityReport({
+      seed: parsed.seed,
+      keyBodyB64: parsed.keyBodyB64,
+      bip39Passphrase: THROWAWAY_BIP39_PASSPHRASE,
+    });
+    check('bip39 passphrase: 24-word phrase unchanged', withPassphrase.mnemonic24, GOLDEN.mnemonic24);
+    check(
+      'bip39 passphrase: fingerprint unchanged',
+      withPassphrase.fingerprint,
+      report.fingerprint,
+    );
+    check(
+      'bip39 passphrase: cryptonote phrase unchanged',
+      withPassphrase.legacyPhrase,
+      GOLDEN.legacy25,
+    );
+    check(
+      'bip39 passphrase: monero unchanged',
+      addressIn(withPassphrase, 'monero'),
+      GOLDEN.moneroLegacyPrimary,
+    );
+    check(
+      'bip39 passphrase: beldex unchanged',
+      addressIn(withPassphrase, 'beldex'),
+      GOLDEN.beldexLegacyPrimary,
+    );
+    check('bip39 passphrase: bchat unchanged', withPassphrase.bchat, GOLDEN.bchat);
+    check('bip39 passphrase: npub moves', withPassphrase.npub !== report.npub, true);
+    check('bip39 passphrase: nsec moves', withPassphrase.nsec !== report.nsec, true);
+    check(
+      'bip39 passphrase: bitcoin moves',
+      addressIn(withPassphrase, 'bitcoin') !== GOLDEN.bitcoin,
+      true,
+    );
+    check(
+      'bip39 passphrase: bitcoin pinned',
+      addressIn(withPassphrase, 'bitcoin'),
+      'bc1q74taletqe9dvsgu994tqrs3gxtka0r7qyxq2nt',
+    );
+    check(
+      'bip39 passphrase: npub pinned',
+      withPassphrase.npub,
+      'npub15hyfawanrteamgq3ppxwcgm0hwvm7tcg0e6glwwr6q4n0xmz9tvqvnhe0m',
+    );
     check('no Buffer global', typeof (globalThis as { Buffer?: unknown }).Buffer, 'undefined');
 
     // Subaccount: derived seed and the downstream fields pinned for label 'alice'.

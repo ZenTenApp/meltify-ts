@@ -63,6 +63,24 @@ const sub = buildSubaccountReport({ seed: parsed.seed, label: 'work', passphrase
 console.log(renderText(sub.report, { color: false })); // sub.report, sub.seed, sub.pem
 ```
 
+### BIP39 passphrase (optional in the core, required in the site)
+
+Both report builders take an optional `bip39Passphrase` — the "25th word" fed to the
+PBKDF2 step that turns the 24 words into the BIP39 seed. It defaults to `''`, which is the
+standard derivation and the only one `meltify-info` can produce, so every golden vector is
+unchanged.
+
+```ts
+buildIdentityReport({ seed: parsed.seed, keyBodyB64: parsed.keyBodyB64, bip39Passphrase });
+buildSubaccountReport({ seed: parsed.seed, label: 'work', passphrase, bip39Passphrase });
+```
+
+A non-empty value moves the Nostr keys and all 28 BIP39-seeded address rows. It cannot move
+the seed, the 24-word phrase, the CryptoNote phrase, the SSH key/fingerprint, Monero,
+Beldex, or the BChat id — those never touch a BIP39 seed. Note what that means for a report:
+the passphrase makes the same 24 words restore to a *different* wallet elsewhere, while the
+25-word Monero phrase still stands on its own.
+
 Lower-level pieces are exported too: `mnemonic24FromSeed`, `nostrKeysFromMnemonic`,
 `deriveWalletAddresses`, `encodeLegacyMnemonic` / `decodeLegacyMnemonic`, `scReduce32`,
 `bchatChatId`, `moneroAddressFromLegacy`, `beldexAddressFromLegacy`,
@@ -213,6 +231,13 @@ written by semantic-release, so do not edit either by hand.
   not. The label is not printed anywhere, as upstream.
 - Only `openssh-key-v1` containers are parsed. Legacy PEM/PKCS#8 Ed25519 containers are not
   accepted; meltify's documented input is an OpenSSH-format Ed25519 key.
+- **The site requires a BIP39 passphrase; the library and `meltify-info` do not.** Upstream
+  has no such flag, so a site report no longer reproduces `meltify-info`'s address rows:
+  the fingerprint, the 24 words, the CryptoNote phrase and the Monero/Beldex/BChat rows
+  still match, and the chain addresses do not. That is a deliberate site policy — it makes
+  "which passphrase does this wallet use?" an explicit, answered question instead of a
+  silent assumption — not parity with the Go binary. The core keeps `''` as its default so
+  the differential suite and every golden stay valid.
 - `test/fixtures/` contains **throwaway test keys** with the committed passphrase
   `test-passphrase`. They protect nothing and exist only to exercise the parser.
 

@@ -47,6 +47,8 @@ export interface BuildSubaccountReportInput {
   passphrase: string;
   /** Marshal overrides; tests use fixed salt/check bytes. Rounds are fixed at 1, as in meltify. */
   marshal?: Pick<MarshalOptions, 'rng' | 'checkBytes' | 'salt'>;
+  /** BIP39 passphrase for the mnemonic -> seed step; see `BuildIdentityReportInput`. */
+  bip39Passphrase?: string;
 }
 
 export interface SubaccountReport {
@@ -64,7 +66,7 @@ export interface SubaccountReport {
  * to the re-encoded subaccount body (meltify-info's behavior under `-s`).
  */
 export function buildSubaccountReport(input: BuildSubaccountReportInput): SubaccountReport {
-  const { seed, label, passphrase, marshal } = input;
+  const { seed, label, passphrase, marshal, bip39Passphrase = '' } = input;
   if (label === '') {
     throw new Error('label must not be empty: an empty label is not a subaccount');
   }
@@ -77,6 +79,10 @@ export function buildSubaccountReport(input: BuildSubaccountReportInput): Subacc
     ...marshal,
     rounds: SUBACCOUNT_KDF_ROUNDS,
   });
-  const report = buildIdentityReport({ seed: derivedSeed, keyBodyB64: key.keyBodyB64 });
+  const report = buildIdentityReport({
+    seed: derivedSeed,
+    keyBodyB64: key.keyBodyB64,
+    bip39Passphrase,
+  });
   return { report, seed: derivedSeed, pem: key.pem, keyBodyB64: key.keyBodyB64 };
 }
