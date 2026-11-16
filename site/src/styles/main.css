@@ -176,6 +176,11 @@ body {
 .strip--off {
   opacity: 0.5;
 }
+/* `display: flex` above beats the UA rule for [hidden]; say it explicitly. */
+.strip[hidden],
+.keyspace[hidden] {
+  display: none;
+}
 .strip__note {
   font-size: 11px;
   color: var(--muted);
