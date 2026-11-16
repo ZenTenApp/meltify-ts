@@ -75,15 +75,10 @@ export function mountKeys(ctx: Ctx): HTMLElement {
             type: 'button',
             class: 'btn',
             onclick: () => {
-              window.dispatchEvent(
-                new CustomEvent('meltify:load-key', {
-                  detail: { pem: result.pem, passphrase: pass },
-                }),
-              );
-              toast('Loaded into Derive');
-              ctx.go('derive');
+              ctx.newKey(result.pem, pass);
+              toast('Loaded into a key tab');
             },
-          }, ['Open in Derive']),
+          }, ['Open in a key tab']),
           el('span', { class: 'hint' }, [`marshalled in ${result.elapsedMs.toFixed(0)} ms`]),
         ]),
       );
@@ -142,7 +137,11 @@ export function mountKeys(ctx: Ctx): HTMLElement {
         'The seed and passphrase stay in this tab, and the downloaded key is the only artifact that survives. Anything derived here is a real key: write it somewhere safe, then wipe this page.',
       ),
       el('div', { class: 'row', style: 'margin-top: 12px' }, [
-        el('a', { class: 'btn ghost small', href: '#/derive' }, ['derive, or derive a subaccount']),
+        el('button', {
+          type: 'button',
+          class: 'btn ghost small',
+          onclick: () => ctx.newKey(),
+        }, ['open a key tab']),
       ]),
     ]),
   ]);

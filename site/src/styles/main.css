@@ -126,46 +126,189 @@ body {
   accent-color: var(--accent);
 }
 
-/* ---------- tabs ---------- */
+/* ---------- tab strips ----------
+   Three nested strips, flat like the old section nav: no backgrounds, no
+   rounded corners, a 1px top border per row, and a 2px accent underline on the
+   selected tab. Level is shown by indent and type size, nothing else. */
 
-.tabs {
-  display: flex;
-  gap: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
+.strips {
   max-width: 1080px;
   width: 100%;
   margin: 6px auto 0;
   padding: 0 12px;
-  border-bottom: 1px solid var(--border-soft);
   position: sticky;
   top: 0;
   z-index: 10;
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
   backdrop-filter: blur(6px);
 }
-.tabs::-webkit-scrollbar {
+
+.strip {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  min-height: 34px;
+}
+.strip + .strip {
+  border-top: none;
+}
+.strip__list {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+  overflow-x: auto;
+  scrollbar-width: none;
+  min-width: 0;
+}
+.strip__list::-webkit-scrollbar {
   display: none;
 }
-.tabs a {
+.strip--sub {
+  padding-left: 10px;
+  min-height: 30px;
+}
+.strip--minor {
+  padding-left: 20px;
+  min-height: 27px;
+}
+.strip--off {
+  opacity: 0.5;
+}
+.strip__note {
+  font-size: 11px;
   color: var(--muted);
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 11px 12px 9px;
-  border-bottom: 2px solid transparent;
+  align-self: center;
   white-space: nowrap;
 }
-.tabs a:hover {
-  color: var(--text);
+
+.tabitem {
+  display: inline-flex;
+  align-items: stretch;
+  border-bottom: 2px solid transparent;
 }
-.tabs a[aria-current="page"] {
-  color: var(--text);
+/* On the wrapper, not the button: the underline runs under the × as well. */
+.tabitem--active {
   border-bottom-color: var(--accent);
 }
-.tabs a[aria-disabled="true"] {
+
+.tab {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 9px 12px 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tab:hover:not(:disabled) {
+  color: var(--text);
+}
+.tab[aria-selected="true"] {
+  color: var(--text);
+}
+.tab--draft {
+  font-style: italic;
+}
+.tab--section {
+  color: var(--muted);
+}
+.tab:disabled {
+  cursor: default;
+}
+.tab__mark {
+  color: var(--accent);
+  margin-left: 4px;
+}
+
+.strip--sub .tab {
+  font-size: 12.5px;
+  padding: 7px 10px 5px;
+  max-width: 12rem;
+}
+.strip--minor .tab {
+  font-size: 11.5px;
+  padding: 5px 9px 4px;
+  max-width: 11rem;
+}
+
+.tab__x {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 7px 9px;
+  margin: auto 0 auto -6px;
+  min-width: 26px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.tabitem:hover .tab__x,
+.tab[aria-selected="true"] + .tab__x {
+  opacity: 1;
+}
+.tab__x:hover {
+  background: #232e3c;
+  color: var(--text);
+}
+
+.tabadd {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 9px 10px 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tabadd:hover:not(:disabled) {
+  color: var(--accent);
+}
+.tabadd:disabled {
   opacity: 0.4;
-  pointer-events: none;
+  cursor: not-allowed;
+}
+.strip--sub .tabadd {
+  font-size: 12.5px;
+  padding: 7px 8px 5px;
+}
+.strip--minor .tabadd {
+  font-size: 11.5px;
+  padding: 5px 8px 4px;
+}
+
+.tabsep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 7px 7px;
+}
+
+.tab__rename {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 8px 7px;
+  border: none;
+  border-bottom: 2px solid var(--accent);
+  border-radius: 0;
+  background: var(--bg-2);
+  color: var(--text);
+  width: 10rem;
 }
 
 /* ---------- layout ---------- */
@@ -609,4 +752,83 @@ code {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ---------- key space: strips + panels ---------- */
+
+/* One panel per row — key, wallet, card, then the leaf — with an even gap
+   between them. `gap` rather than margins so an empty slot leaves no hole. */
+.keyspace {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.keyspace > div:empty {
+  display: none;
+}
+.keyspace > div > .card {
+  margin-bottom: 0;
+}
+
+.inline-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+.card > h2.inline-title {
+  font-size: 13.5px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+  margin: 0;
+}
+
+.draftcard {
+  border-style: dashed;
+  border-color: #33445c;
+  background: #111823;
+}
+
+/* ---------- leaf panel ---------- */
+
+.leaf {
+  margin-top: 18px;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.leaf__head {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.leaf__head .pills {
+  margin-top: 0;
+}
+.leaf__body {
+  margin-top: 14px;
+}
+.crumb {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  font-size: 12.5px;
+  color: var(--muted);
+  min-height: 18px;
+}
+.crumb__part {
+  color: var(--muted);
+}
+.crumb__leaf {
+  color: var(--text);
+  font-weight: 700;
+}
+.crumb__sep {
+  color: #46556a;
 }

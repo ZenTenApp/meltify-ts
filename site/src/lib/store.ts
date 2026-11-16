@@ -1,7 +1,15 @@
-/** Single source of truth for the derived identity. In memory only, never persisted. */
+/**
+ * Tab tree: one tab per SSH key, each key holds wallet tabs (subaccounts), each
+ * wallet holds card tabs (BIP39 passphrases). The *leaf* of the active path —
+ * the deepest selected node — is the identity the report shows.
+ *
+ * Everything is in memory only and is never persisted. `resetAll()` returns the
+ * app to the same state as a fresh load: one empty key draft, selected.
+ */
 
 import type { IdentityReport } from 'meltify-ts';
 
+/** A derived identity. Unchanged shape from the single-identity version. */
 export interface Identity {
   report: IdentityReport;
   seedHex: string;
@@ -13,9 +21,7 @@ export interface Identity {
   subaccount: string;
   /**
    * BIP39 passphrase the report was derived with; '' when it was left empty (the
-   * standard derivation). Optional in the site and in the core, but the Derive
-   * view recommends it, and the Report tab needs it to say which derivation the
-   * addresses come from.
+   * standard derivation).
    */
   bip39Passphrase: string;
   /** Re-encoded subaccount PEM (same passphrase, bcrypt rounds 1); absent for the source key. */
@@ -23,38 +29,479 @@ export interface Identity {
   derivedAt: number;
 }
 
-export interface AppState {
+/** `draft` = named but not committed; `ready` = has everything it needs to derive. */
+export type NodeStatus = 'draft' | 'ready';
+
+interface NodeBase {
+  id: string;
+  label: string;
+  status: NodeStatus;
+  /** Derived identity for this node, or null until derivation finishes. */
   identity: Identity | null;
+  deriving: boolean;
+  /** Last derivation failure, shown in the leaf panel. */
+  error: string | null;
 }
+
+export interface CardTab extends NodeBase {
+  /** BIP39 passphrase, verbatim. Empty is legal: it means the standard derivation. */
+  secret: string;
+}
+
+export interface WalletTab extends NodeBase {
+  /** Subaccount string, hashed byte-for-byte. Never trimmed, never normalised. */
+  secret: string;
+  cards: CardTab[];
+  activeCard: string | null;
+}
+
+export interface KeyTab extends NodeBase {
+  pem: string;
+  passphrase: string;
+  /** Filename, or 'pasted key'. Falls back to the tab label. */
+  source: string;
+  wallets: WalletTab[];
+  activeWallet: string | null;
+}
+
+export type SectionId = 'selfcheck' | 'keytools' | 'phrases';
+
+export interface AppState {
+  /** Which top-row tab is showing: a fixed section, or the active key's body. */
+  section: SectionId | 'key';
+  keys: KeyTab[];
+  activeKey: string | null;
+}
+
+export interface LeafInfo {
+  key: KeyTab;
+  wallet: WalletTab | null;
+  card: CardTab | null;
+  /** The node whose identity the report should show. */
+  node: KeyTab | WalletTab | CardTab;
+  kind: 'key' | 'wallet' | 'card';
+}
+
+/* ------------------------------------------------------------------ *
+ * Store
+ * ------------------------------------------------------------------ */
 
 type Listener = (state: AppState) => void;
 
 const listeners = new Set<Listener>();
-let identity: Identity | null = null;
+let nextId = 1;
+
+function nid(prefix: string): string {
+  const id = `${prefix}${nextId}`;
+  nextId += 1;
+  return id;
+}
+
+function draftKey(pem = '', passphrase = '', source = ''): KeyTab {
+  return {
+    id: nid('k'),
+    label: 'Add SSH Key',
+    pem,
+    passphrase,
+    source,
+    status: 'draft',
+    identity: null,
+    deriving: false,
+    error: null,
+    wallets: [],
+    activeWallet: null,
+  };
+}
+
+export function initialState(): AppState {
+  const key = draftKey();
+  return { section: 'key', keys: [key], activeKey: key.id };
+}
+
+let state: AppState = initialState();
 
 export function getState(): AppState {
-  return { identity };
-}
-
-export function setIdentity(next: Identity): void {
-  identity = next;
-  emit();
-}
-
-export function clearIdentity(): void {
-  identity = null;
-  emit();
+  return state;
 }
 
 export function subscribe(listener: Listener): () => void {
   listeners.add(listener);
-  listener(getState());
+  listener(state);
   return () => {
     listeners.delete(listener);
   };
 }
 
 function emit(): void {
-  const state = getState();
   for (const listener of listeners) listener(state);
+}
+
+function update(mutate: (draft: AppState) => void): void {
+  mutate(state);
+  emit();
+}
+
+function findKey(id: string): KeyTab | undefined {
+  return state.keys.find((key) => key.id === id);
+}
+
+/** Every node that carries derivation state, so status helpers stay in one place. */
+export function findNode(id: string): KeyTab | WalletTab | CardTab | undefined {
+  for (const key of state.keys) {
+    if (key.id === id) return key;
+    for (const wallet of key.wallets) {
+      if (wallet.id === id) return wallet;
+      const card = wallet.cards.find((entry) => entry.id === id);
+      if (card !== undefined) return card;
+    }
+  }
+  return undefined;
+}
+
+export function activeKey(state: AppState): KeyTab | null {
+  return state.keys.find((key) => key.id === state.activeKey) ?? null;
+}
+
+/**
+ * Deepest node on the active path. A ready key with no wallet shows the source
+ * identity; a wallet with no card shows the subaccount identity.
+ */
+export function leafOf(appState: AppState): LeafInfo | null {
+  const key = activeKey(appState);
+  if (key === null) return null;
+  const wallet = key.wallets.find((entry) => entry.id === key.activeWallet) ?? null;
+  if (wallet === null) return { key, wallet: null, card: null, node: key, kind: 'key' };
+  const card = wallet.cards.find((entry) => entry.id === wallet.activeCard) ?? null;
+  if (card === null) return { key, wallet, card: null, node: wallet, kind: 'wallet' };
+  return { key, wallet, card, node: card, kind: 'card' };
+}
+
+/* ------------------------------------------------------------------ *
+ * Navigation
+ * ------------------------------------------------------------------ */
+
+export function selectSection(id: SectionId): void {
+  update((draft) => {
+    draft.section = id;
+  });
+}
+
+export function selectKey(id: string): void {
+  update((draft) => {
+    if (!draft.keys.some((key) => key.id === id)) return;
+    draft.section = 'key';
+    draft.activeKey = id;
+  });
+}
+
+export function selectWallet(keyId: string, walletId: string | null): void {
+  update((draft) => {
+    const key = draft.keys.find((entry) => entry.id === keyId);
+    if (key === undefined) return;
+    key.activeWallet = walletId;
+    if (walletId === null) return;
+    // A wallet with exactly one card is unambiguous; preselect it.
+    const wallet = key.wallets.find((entry) => entry.id === walletId);
+    if (wallet !== undefined && wallet.activeCard === null && wallet.cards.length === 1) {
+      wallet.activeCard = wallet.cards[0]?.id ?? null;
+    }
+  });
+}
+
+export function selectCard(keyId: string, walletId: string, cardId: string | null): void {
+  update((draft) => {
+    const wallet = draft.keys
+      .find((entry) => entry.id === keyId)
+      ?.wallets.find((entry) => entry.id === walletId);
+    if (wallet === undefined) return;
+    wallet.activeCard = cardId;
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Keys
+ * ------------------------------------------------------------------ */
+
+/**
+ * Selects the existing key draft, or opens a new one. Only one key draft exists
+ * at a time: a second blank form is never useful.
+ */
+export function newKeyDraft(pem = '', passphrase = '', source = ''): string {
+  const existing = state.keys.find((key) => key.status === 'draft');
+  if (existing !== undefined) {
+    update((draft) => {
+      const key = draft.keys.find((entry) => entry.id === existing.id);
+      if (key === undefined) return;
+      if (pem !== '') key.pem = pem;
+      if (passphrase !== '') key.passphrase = passphrase;
+      if (source !== '') key.source = source;
+      draft.section = 'key';
+      draft.activeKey = key.id;
+    });
+    return existing.id;
+  }
+  const key = draftKey(pem, passphrase, source);
+  update((draft) => {
+    draft.keys.push(key);
+    draft.section = 'key';
+    draft.activeKey = key.id;
+  });
+  return key.id;
+}
+
+export interface CommitKeyInput {
+  pem: string;
+  passphrase: string;
+  source: string;
+  label: string;
+  identity: Identity;
+}
+
+/** Commits a key draft. Returns an error message, or null on success. */
+export function commitKey(id: string, input: CommitKeyInput): string | null {
+  const pem = input.pem.trim();
+  const duplicate = state.keys.find(
+    (key) => key.id !== id && key.status === 'ready' && key.pem.trim() === pem,
+  );
+  if (duplicate !== undefined) {
+    return `That key is already open in the “${duplicate.label}” tab.`;
+  }
+  update((draft) => {
+    const key = draft.keys.find((entry) => entry.id === id);
+    if (key === undefined) return;
+    key.pem = input.pem;
+    key.passphrase = input.passphrase;
+    key.source = input.source;
+    key.status = 'ready';
+    key.identity = input.identity;
+    key.error = null;
+    const taken = new Set(draft.keys.filter((entry) => entry.id !== id).map((entry) => entry.label));
+    key.label = uniqueLabel(input.label === '' ? defaultKeyLabel(input.source, draft.keys.length) : input.label, taken);
+  });
+  return null;
+}
+
+function defaultKeyLabel(source: string, count: number): string {
+  if (source !== '' && source !== 'pasted key') return source;
+  return `Key ${count}`;
+}
+
+function uniqueLabel(base: string, taken: ReadonlySet<string>): string {
+  if (!taken.has(base)) return base;
+  let index = 2;
+  while (taken.has(`${base} (${index})`)) index += 1;
+  return `${base} (${index})`;
+}
+
+/** Removes a key tab. The last key is replaced by a fresh draft, as in a browser. */
+export function removeKey(id: string): void {
+  update((draft) => {
+    const index = draft.keys.findIndex((key) => key.id === id);
+    if (index === -1) return;
+    draft.keys.splice(index, 1);
+    if (draft.keys.length === 0) {
+      const key = draftKey();
+      draft.keys.push(key);
+      draft.activeKey = key.id;
+      draft.section = 'key';
+      return;
+    }
+    if (draft.activeKey === id) {
+      const next = draft.keys[Math.min(index, draft.keys.length - 1)];
+      draft.activeKey = next?.id ?? null;
+      draft.section = 'key';
+    }
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Wallets
+ * ------------------------------------------------------------------ */
+
+export function addWalletDraft(keyId: string): string | null {
+  const key = findKey(keyId);
+  if (key === undefined || key.status !== 'ready') return null;
+  const existing = key.wallets.find((wallet) => wallet.status === 'draft');
+  if (existing !== undefined) {
+    selectWallet(keyId, existing.id);
+    return existing.id;
+  }
+  const wallet: WalletTab = {
+    id: nid('w'),
+    label: `Wallet ${key.wallets.length + 1}`,
+    secret: '',
+    status: 'draft',
+    identity: null,
+    deriving: false,
+    error: null,
+    cards: [],
+    activeCard: null,
+  };
+  update((draft) => {
+    draft.keys.find((entry) => entry.id === keyId)?.wallets.push(wallet);
+    const parent = draft.keys.find((entry) => entry.id === keyId);
+    if (parent !== undefined) parent.activeWallet = wallet.id;
+  });
+  return wallet.id;
+}
+
+export function commitWallet(keyId: string, walletId: string, secret: string, label: string): string | null {
+  const key = findKey(keyId);
+  const wallet = key?.wallets.find((entry) => entry.id === walletId);
+  if (key === undefined || wallet === undefined) return 'That tab is gone.';
+  if (secret === '') {
+    return 'The wallet secret is required. With no secret there is no subaccount — that identity is the key itself.';
+  }
+  const duplicate = key.wallets.find(
+    (entry) => entry.id !== walletId && entry.status === 'ready' && entry.secret === secret,
+  );
+  if (duplicate !== undefined) {
+    return `A wallet with that secret already exists in this key (“${duplicate.label}”). Secrets are hashed byte-for-byte, so even invisible whitespace counts.`;
+  }
+  update((draft) => {
+    const target = draft.keys
+      .find((entry) => entry.id === keyId)
+      ?.wallets.find((entry) => entry.id === walletId);
+    if (target === undefined) return;
+    target.secret = secret;
+    target.status = 'ready';
+    target.error = null;
+    const taken = new Set(
+      (draft.keys.find((entry) => entry.id === keyId)?.wallets ?? [])
+        .filter((entry) => entry.id !== walletId)
+        .map((entry) => entry.label),
+    );
+    target.label = uniqueLabel(label === '' ? target.label : label, taken);
+  });
+  return null;
+}
+
+export function removeWallet(keyId: string, walletId: string): void {
+  update((draft) => {
+    const key = draft.keys.find((entry) => entry.id === keyId);
+    if (key === undefined) return;
+    key.wallets = key.wallets.filter((entry) => entry.id !== walletId);
+    if (key.activeWallet === walletId) key.activeWallet = key.wallets.at(-1)?.id ?? null;
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Cards
+ * ------------------------------------------------------------------ */
+
+export function addCardDraft(keyId: string, walletId: string): string | null {
+  const wallet = findKey(keyId)?.wallets.find((entry) => entry.id === walletId);
+  if (wallet === undefined || wallet.status !== 'ready') return null;
+  const existing = wallet.cards.find((card) => card.status === 'draft');
+  if (existing !== undefined) {
+    selectCard(keyId, walletId, existing.id);
+    return existing.id;
+  }
+  const card: CardTab = {
+    id: nid('c'),
+    label: `Card ${wallet.cards.length + 1}`,
+    secret: '',
+    status: 'draft',
+    identity: null,
+    deriving: false,
+    error: null,
+  };
+  update((draft) => {
+    const target = draft.keys
+      .find((entry) => entry.id === keyId)
+      ?.wallets.find((entry) => entry.id === walletId);
+    if (target === undefined) return;
+    target.cards.push(card);
+    target.activeCard = card.id;
+  });
+  return card.id;
+}
+
+export function commitCard(
+  keyId: string,
+  walletId: string,
+  cardId: string,
+  secret: string,
+  label: string,
+): string | null {
+  const wallet = findKey(keyId)?.wallets.find((entry) => entry.id === walletId);
+  if (wallet === undefined) return 'That tab is gone.';
+  const duplicate = wallet.cards.find(
+    (entry) => entry.id !== cardId && entry.status === 'ready' && entry.secret === secret,
+  );
+  if (duplicate !== undefined) {
+    return secret === ''
+      ? `This wallet already has a card with no passphrase (“${duplicate.label}”).`
+      : `A card with that passphrase already exists (“${duplicate.label}”).`;
+  }
+  update((draft) => {
+    const target = draft.keys
+      .find((entry) => entry.id === keyId)
+      ?.wallets.find((entry) => entry.id === walletId);
+    const card = target?.cards.find((entry) => entry.id === cardId);
+    if (target === undefined || card === undefined) return;
+    card.secret = secret;
+    card.status = 'ready';
+    card.error = null;
+    const taken = new Set(target.cards.filter((entry) => entry.id !== cardId).map((entry) => entry.label));
+    card.label = uniqueLabel(label === '' ? card.label : label, taken);
+  });
+  return null;
+}
+
+export function removeCard(keyId: string, walletId: string, cardId: string): void {
+  update((draft) => {
+    const wallet = draft.keys
+      .find((entry) => entry.id === keyId)
+      ?.wallets.find((entry) => entry.id === walletId);
+    if (wallet === undefined) return;
+    wallet.cards = wallet.cards.filter((entry) => entry.id !== cardId);
+    if (wallet.activeCard === cardId) wallet.activeCard = wallet.cards.at(-1)?.id ?? null;
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Node status
+ * ------------------------------------------------------------------ */
+
+export function renameNode(id: string, label: string): void {
+  const trimmed = label.trim();
+  if (trimmed === '') return;
+  update(() => {
+    const node = findNode(id);
+    if (node === undefined) return;
+    if (node.status === 'draft' && 'pem' in node) return; // a key draft has no name yet
+    node.label = trimmed;
+  });
+}
+
+export function setDeriving(id: string, value: boolean): void {
+  update(() => {
+    const node = findNode(id);
+    if (node !== undefined) node.deriving = value;
+  });
+}
+
+export function setDerived(id: string, identity: Identity): void {
+  update(() => {
+    const node = findNode(id);
+    if (node === undefined) return;
+    node.identity = identity;
+    node.error = null;
+    node.deriving = false;
+  });
+}
+
+export function setError(id: string, message: string | null): void {
+  update(() => {
+    const node = findNode(id);
+    if (node === undefined) return;
+    node.error = message;
+    node.deriving = false;
+  });
+}
+
+export function resetAll(): void {
+  state = initialState();
+  emit();
 }

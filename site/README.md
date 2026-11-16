@@ -8,10 +8,12 @@ identity report. No server, no uploads, no analytics.
 site/
   index.html            app shell (asset placeholders filled at build time)
   src/
-    main.ts             hash router, tabs, global wipe
-    app-types.ts        TabId + view context
-    lib/                dom, clipboard, download, hex, store, worker client, value blocks
-    views/              derive, report, chains, compat, phrases, keys, selfcheck
+    main.ts             shell: three tab strips, body routing, derive driver, wipe
+    app-types.ts        shell context for the fixed section views
+    lib/                dom, clipboard, download, hex, store (tab tree), tabstrip,
+                        worker client, value blocks
+    views/              keyform, keyspace, leaf, report, chains, compat, phrases, keys,
+                        selfcheck
     worker/entry.ts     derive worker (bcrypt/AES + all derivations)
     styles/main.css
   public/.htaccess      CSP + caching for Apache/cPanel (copied into dist)
@@ -35,17 +37,30 @@ PORT=8080 npm run site:serve
 `site/dist/` is the deployable artifact: `index.html`, `assets/` (hashed, immutable),
 and `.htaccess`.
 
-## What each tab does
+## Layout
 
-| Tab | Feature |
-| --- | --- |
-| Derive | File drop or paste, passphrase, subaccount label and BIP39 passphrase (both optional, both recommended), throwaway key (pinned seed `00..1f` or random; its fixed `test-passphrase` and `test-bip39-passphrase` are filled in and shown) |
-| Report | Secret + public blocks, per-field reveal, public/full JSON export, subaccount key download, wipe |
-| Chains | 30 labeled addresses grouped by family, plus the Monero subaddresses and Cake/Unstoppable rows from `buildMoneroReport`; filter, CSV export |
-| meltify-info | `renderText` output in meltify-info's own colours, `.txt` download (plain form is the parity target) |
-| Phrase lab | seed → MELT/CryptoNote phrase plus the `meltify-monero` section (Monero primary + subaddresses 0,1–0,9, Cake/Unstoppable seed and its addresses), phrase → BIP39 seed, 25-word phrase → Monero/Beldex primaries and subaddresses + BChat |
-| Key tools | Marshal a new password-protected key (rounds 1 or 16) and hand it to Derive |
-| Self-check | Re-runs the pinned Go vectors against the loaded bundle |
+Three nested browser-style tab strips, in order:
+
+| Row | Strip | `+` behaviour | Body below it |
+| --- | --- | --- | --- |
+| 1 | Fixed sections (Self-check, Key tools, Phrase lab) │ SSH key tabs | opens a key draft tab; labelled `+` only when there is nothing yet — the draft tab itself reads **Add SSH Key** and is selected on load | key form: file drop or paste, passphrase, tab name; **Add SSH key** unlocks in the worker. *Try a throwaway key* uses the pinned seed `00..1f` or a random one |
+| 2 | Wallets (subaccounts) | `+ Add wallet` on an empty row, `+` after that | draft tab body: **secret** (the subaccount string, hashed verbatim) and **name** |
+| 3 | Cards (BIP39 passphrases) | `+ Add card` / `+` | draft tab body: **secret** (the 25th word, masked, optional) and **name** |
+
+Rows 2 and 3 are disabled until a key exists and are hidden while a fixed
+section is showing. Everything you type lives in the body under the strip, never
+inside a tab. Double-click a committed tab to rename it — the label only, never
+the secret.
+
+The deepest selected tab is the **leaf**, and the leaf's identity is the panel at
+the bottom: Report / Chains / meltify-info. A key with no wallet shows the source
+identity; a wallet with no card shows the subaccount with the standard (empty)
+BIP39 passphrase. Derivations are lazy — a leaf derives when it is selected and
+is cached on its tab.
+
+No duplicates: keys are deduplicated by PEM text, wallets by the subaccount
+string (byte-for-byte), cards by the passphrase. A refused duplicate leaves the
+draft tab open with the reason.
 
 ## Design notes
 
@@ -58,15 +73,19 @@ and `.htaccess`.
 - **Masking is cosmetic and per field.** Seed, phrase, nsec, and the private-key
   body each carry their own reveal button on the Report tab, but they are plain
   strings in memory — same caveat as the terminal tool.
-- **Subaccounts are a label on Derive, not a tab, and the label is optional.** Filling
-  it derives the child identity in the same worker call and re-encodes the key with
-  the same passphrase at bcrypt rounds 1, exactly like `meltify-info --subaccount`.
-  Every other tab then shows the subaccount's identity, the Report footer names the
-  label, and the Report export offers the re-encoded subaccount key. An empty label
-  is the source key, the same as the library. The label is not secret, and it is the
-  only thing that has to be remembered to get the subaccount back, so the field is
-  labeled *optional, recommended* and *Try a throwaway key* fills in
-  `my-throwaway-subaccount` to show the recommended path.
+- **A wallet tab is a subaccount, and its secret is hashed verbatim.** The wallet
+  secret is exactly the `--subaccount` string: `seed = SHA256(SHA256(utf8(secret)) ‖
+  key seed)`, re-encoded with the key's passphrase at bcrypt rounds 1. The UI never
+  trims it and never normalises it, because `meltify-info` hashes exactly these
+  bytes — `work ` and `work` are different wallets, and the form says so when it
+  sees whitespace or non-ASCII. The wallet *name* is display only and can be
+  changed at any time.
+- **A card tab is the BIP39 passphrase, and hiding it is the only difference.**
+  Cards feed the PBKDF2 step in `buildIdentityReport({ bip39Passphrase })`, so they
+  move the Nostr keys and the 28 BIP39-seeded address rows and leave the seed, the
+  phrases, the SSH key, Monero and Beldex alone. `@scure/bip39` applies NFKD itself,
+  so the UI adds no normalisation of its own. An empty card is a real card: the
+  standard derivation, the one `meltify-info` produces.
 - **The BIP39 passphrase is optional too, and recommended the same way.** It is fed
   to the PBKDF2 step in `buildIdentityReport({ bip39Passphrase })`, so it moves the
   Nostr keys and the 28 BIP39-seeded address rows and leaves the seed, the phrases,
@@ -82,8 +101,9 @@ and `.htaccess`.
   sequences to spans (`lib/ansi.ts`), so the palette is never duplicated here.
 - **Clipboard has a fallback.** `navigator.clipboard` needs a secure context;
   the legacy `execCommand` path keeps copy working over plain http on a LAN.
-- **Hash routing only.** No rewrite rules needed, so the build drops into
-  `public_html/` or a subdirectory unchanged.
+- **No routing at all.** Tab selection is in-memory state, not the URL, so the
+  build drops into `public_html/` or a subdirectory unchanged and a reload always
+  starts from an empty **Add SSH Key** tab.
 
 ## Deploying to cPanel
 
@@ -99,7 +119,7 @@ Do not upload into the document root itself: the `.htaccess` here sets a
 site-wide CSP and year-long `immutable` caching for every `.js`/`.css` beneath
 it, which would break whatever else lives there.
 
-The links in `index.html` are relative and routing is hash-only, so no build
+The links in `index.html` are relative and there is no routing, so no build
 change is needed for the subdirectory and no rewrite rules are involved.
 
 The canonical URL ends in a slash: `https://nostr.box/meltify/`. Relative asset
@@ -140,9 +160,10 @@ Then check:
 2. DevTools → Network shows exactly two requests after load (no third parties).
 3. Response headers include the `Content-Security-Policy` from `.htaccess`.
    cPanel needs `mod_headers` enabled (it is on standard cPanel/Apache builds).
-4. **Try a throwaway key** works — it needs `crypto.getRandomValues`, which is
-   available over http too, but serve over HTTPS anyway: without a secure
-   context the clipboard falls back to the legacy path.
+4. **Try a throwaway key** works, and so does adding a wallet and a card under
+   it — those need `crypto.getRandomValues`, which is available over http too, but
+   serve over HTTPS anyway: without a secure context the clipboard falls back to
+   the legacy path.
 
 The worker is a separate file under `assets/`. If your host blocks or mangles
 module workers, the symlink-free fix is to keep `assets/` intact and confirm
@@ -150,8 +171,10 @@ module workers, the symlink-free fix is to keep `assets/` intact and confirm
 
 ## Verification
 
-`npm run verify` includes `site:typecheck`. Beyond that, the build was checked
-by booting the bundle in jsdom (7 views mount, worker URL resolves) and by
-running the built worker bundle against the golden seed: 46/47 self-check rows
-pass, the 47th ("no Buffer global") is browser-only and fails under Node by
-design.
+`npm run verify` includes `site:typecheck`. Beyond that, the built bundle was
+booted in jsdom with a stubbed worker and driven through the real click paths:
+strip order and defaults, the disabled rows below a key, section switching, key
+commit, wallet/card drafts, the empty-secret and duplicate refusals, the
+whitespace warning, tab rename, tab close and the global wipe. The built worker
+bundle also runs against the golden seed: 46/47 self-check rows pass, the 47th
+("no Buffer global") is browser-only and fails under Node by design.
