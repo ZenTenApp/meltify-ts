@@ -123,7 +123,7 @@ export function mountKeySpace(key: KeyTab): KeySpace {
           ]),
         ]),
         hint(
-          'Wallets derived from this key appear on the row below. With no wallet selected the panel shows the key’s own identity.',
+          'Wallets derived from this key appear on the row below. The green tab at the left is the empty wallet — the key’s own identity, with no subaccount.',
         ),
       ]),
     );
@@ -138,7 +138,7 @@ export function mountKeySpace(key: KeyTab): KeySpace {
       walletPanel.replaceChildren(
         el('section', { class: 'card tight' }, [
           hint(
-            'No wallet selected. “+ Add wallet” names a subaccount: a different, deterministic key derived from this one, with its own cards and its own identity below.',
+            'Empty wallet selected. “+ Add wallet” names a subaccount: a different, deterministic key derived from this one, with its own cards and its own identity below. The green tab in the wallet row comes back here.',
           ),
         ]),
       );
@@ -185,7 +185,7 @@ export function mountKeySpace(key: KeyTab): KeySpace {
       cardPanel.replaceChildren(
         el('section', { class: 'card tight' }, [
           hint(
-            'No card yet. The panel below shows this wallet with the standard (empty) BIP39 passphrase — exactly what every wallet matches. Add a card only for a wallet that uses a 25th word.',
+            'Empty card selected. The panel below shows this wallet with the standard (empty) BIP39 passphrase — exactly what every wallet matches. Add a card only for a wallet that uses a 25th word; the green tab in the card row comes back here.',
           ),
         ]),
       );

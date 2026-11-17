@@ -225,6 +225,33 @@ body {
 .tab--section {
   color: var(--muted);
 }
+/* The immutable empty tab at the left of the wallet and card rows. No label, so
+   the only thing it carries is the palette's public/unmasked colour: it names
+   no secret and can be neither renamed nor closed. */
+.tab--plain {
+  min-width: 30px;
+  padding-left: 9px;
+  padding-right: 9px;
+}
+.tab--plain::before {
+  content: '';
+  display: inline-block;
+  vertical-align: middle;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--public);
+  opacity: 0.45;
+}
+.tab--plain:hover:not(:disabled)::before,
+.tab--plain[aria-selected='true']::before {
+  opacity: 1;
+}
+.strip--minor .tab--plain {
+  min-width: 24px;
+  padding-left: 7px;
+  padding-right: 7px;
+}
 .tab:disabled {
   cursor: default;
 }

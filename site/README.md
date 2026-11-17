@@ -48,9 +48,13 @@ Three nested browser-style tab strips, in order:
 | 3 | Cards (BIP39 passphrases) | `+ Add card` / `+` | draft tab body: **secret** (the 25th word, masked, optional) and **name** |
 
 Rows 2 and 3 are disabled until a key exists and are hidden while a fixed
-section is showing. Everything you type lives in the body under the strip, never
-inside a tab. Double-click a committed tab to rename it — the label only, never
-the secret.
+section is showing. Each of those rows starts with an immutable **empty tab**:
+unlabelled, green, not closable and not renameable. It is the node *above* the
+row — the key with no wallet on row 2, the wallet with no card (the standard,
+empty BIP39 passphrase) on row 3 — and selecting it is how you get back to that
+identity once wallets or cards exist. Everything you type lives in the body
+under the strip, never inside a tab. Double-click a committed tab to rename
+it — the label only, never the secret.
 
 The deepest selected tab is the **leaf**, and the leaf's identity is the panel at
 the bottom: Report / Chains / meltify-info. A key with no wallet shows the source
@@ -99,6 +103,8 @@ draft tab open with the reason.
   the binary's private-value colour; anything unmasked is green. The
   meltify-info tab reuses `renderText({ color: true })` and converts its SGR
   sequences to spans (`lib/ansi.ts`), so the palette is never duplicated here.
+  The empty wallet and empty card tabs borrow that green: they hold no secret,
+  and with no label they cannot name one.
 - **Clipboard has a fallback.** `navigator.clipboard` needs a secure context;
   the legacy `execCommand` path keeps copy working over plain http on a LAN.
 - **No routing at all.** Tab selection is in-memory state, not the URL, so the

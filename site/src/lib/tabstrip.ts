@@ -20,6 +20,13 @@ export interface StripTab {
   title?: string;
   /** Static section tab: never closable, never renameable. */
   section?: boolean;
+  /**
+   * The immutable "nothing selected here" node: an unlabelled green dot, drawn
+   * first in its row. Green is the palette's public/unmasked colour, and having
+   * no label means it names no secret and cannot be renamed. Like a section tab
+   * it is never closable.
+   */
+  plain?: boolean;
   /** Draws a divider before this tab (fixed sections | dynamic tabs). */
   dividerBefore?: boolean;
 }
@@ -77,27 +84,33 @@ export function createStrip(): Strip {
         list.append(el('span', { class: 'tabsep', role: 'presentation', 'aria-hidden': 'true' }));
       }
       const isActive = tab.id === options.activeId && !options.disabled;
+      const plain = tab.plain === true;
       const button = el(
         'button',
         {
           type: 'button',
-          class: `tab${tab.draft === true ? ' tab--draft' : ''}${tab.section === true ? ' tab--section' : ''}`,
+          class: `tab${tab.draft === true ? ' tab--draft' : ''}${tab.section === true ? ' tab--section' : ''}${plain ? ' tab--plain' : ''}`,
           role: 'tab',
           'aria-selected': isActive ? 'true' : 'false',
           tabindex: isActive ? 0 : -1,
           title: tab.title ?? tab.label,
+          ...(plain ? { 'aria-label': tab.title ?? 'No selection' } : {}),
         },
-        [tab.label, ...(tab.mark === undefined ? [] : [el('span', { class: 'tab__mark' }, [tab.mark])])],
+        plain
+          ? []
+          : [tab.label, ...(tab.mark === undefined ? [] : [el('span', { class: 'tab__mark' }, [tab.mark])])],
       );
       button.dataset.tabId = tab.id;
       if (options.disabled === true) button.disabled = true;
       button.addEventListener('click', () => options.onSelect(tab.id));
       button.addEventListener('dblclick', () => {
-        if (tab.section === true || options.onRename === undefined || options.disabled === true) return;
+        if (tab.section === true || plain || options.onRename === undefined || options.disabled === true) {
+          return;
+        }
         beginRename(tab, button);
       });
 
-      if (tab.section !== true && options.onClose !== undefined) {
+      if (tab.section !== true && !plain && options.onClose !== undefined) {
         const close = el('button', {
           type: 'button',
           class: 'tab__x',
@@ -136,9 +149,11 @@ export function createStrip(): Strip {
       if (tab !== undefined) options.onSelect(tab.id);
     });
 
+    // The plain tab is always there, so label the `+` while the row has nothing else.
+    const named = options.tabs.filter((tab) => tab.plain !== true).length;
     const add = el('button', {
       type: 'button',
-      class: `tabadd${options.tabs.length === 0 ? ' tabadd--labelled' : ''}`,
+      class: `tabadd${named === 0 ? ' tabadd--labelled' : ''}`,
       title: options.addTitle,
       'aria-label': options.addTitle,
     }, [options.addLabel]);

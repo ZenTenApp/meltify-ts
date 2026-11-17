@@ -54,6 +54,14 @@ const SECTIONS: readonly { id: SectionId; label: string }[] = [
   { id: 'phrases', label: 'Phrase lab' },
 ];
 
+/**
+ * Ids for the immutable empty tab at the left of the wallet and card rows. They
+ * are not store nodes: selecting one means "this key with no wallet" or "this
+ * wallet with no card" (the standard, empty BIP39 passphrase).
+ */
+const EMPTY_WALLET = 'none:wallet';
+const EMPTY_CARD = 'none:card';
+
 function main(): void {
   const stripHost = must<HTMLElement>('#strips');
   const body = must<HTMLElement>('#views');
@@ -161,7 +169,7 @@ function main(): void {
     walletStrip.root.hidden = key === null;
     if (key === null) return;
     const ready = key.status === 'ready';
-    const tabs = key.wallets.map((wallet) => ({
+    const wallets = key.wallets.map((wallet) => ({
       id: wallet.id,
       label: wallet.label,
       draft: wallet.status === 'draft',
@@ -174,21 +182,32 @@ function main(): void {
     walletStrip.render({
       label: 'Wallets',
       variant: 'sub',
-      tabs,
-      activeId: key.activeWallet,
-      addLabel: tabs.length === 0 ? '+ Add wallet' : '+',
+      tabs: [
+        {
+          id: EMPTY_WALLET,
+          label: '',
+          plain: true,
+          title: 'Empty wallet — the key itself, with no subaccount',
+        },
+        ...wallets,
+      ],
+      activeId: key.activeWallet ?? EMPTY_WALLET,
+      addLabel: wallets.length === 0 ? '+ Add wallet' : '+',
       addTitle: 'Add wallet',
       disabled: !ready,
       disabledNote: ready ? undefined : 'add a key first',
-      onSelect: (id) => selectWallet(key.id, id),
+      onSelect: (id) => selectWallet(key.id, id === EMPTY_WALLET ? null : id),
       onAdd: () => {
         addWalletDraft(key.id);
       },
       onClose: (id) => {
+        if (id === EMPTY_WALLET) return;
         spaces.get(key.id)?.forget(id);
         removeWallet(key.id, id);
       },
-      onRename: (id, label) => renameNode(id, label),
+      onRename: (id, label) => {
+        if (id !== EMPTY_WALLET) renameNode(id, label);
+      },
     });
   }
 
@@ -197,7 +216,7 @@ function main(): void {
     if (key === null) return;
     const ready = key.status === 'ready' && wallet !== null && wallet.status === 'ready';
     const cards = wallet?.cards ?? [];
-    const tabs = cards.map((card) => ({
+    const cardTabs = cards.map((card) => ({
       id: card.id,
       label: card.label,
       draft: card.status === 'draft',
@@ -212,9 +231,17 @@ function main(): void {
     cardStrip.render({
       label: 'Cards',
       variant: 'minor',
-      tabs,
-      activeId: wallet?.activeCard ?? null,
-      addLabel: tabs.length === 0 ? '+ Add card' : '+',
+      tabs: [
+        {
+          id: EMPTY_CARD,
+          label: '',
+          plain: true,
+          title: 'Empty card — no BIP39 passphrase, the standard derivation',
+        },
+        ...cardTabs,
+      ],
+      activeId: wallet?.activeCard ?? EMPTY_CARD,
+      addLabel: cardTabs.length === 0 ? '+ Add card' : '+',
       addTitle: 'Add card',
       disabled: !ready,
       disabledNote: !ready
@@ -223,16 +250,19 @@ function main(): void {
           : 'create the wallet first'
         : undefined,
       onSelect: (id) => {
-        if (wallet !== null) selectCard(key.id, wallet.id, id);
+        if (wallet !== null) selectCard(key.id, wallet.id, id === EMPTY_CARD ? null : id);
       },
       onAdd: () => {
         if (wallet !== null) addCardDraft(key.id, wallet.id);
       },
       onClose: (id) => {
+        if (id === EMPTY_CARD) return;
         spaces.get(key.id)?.forget(id);
         if (wallet !== null) removeCard(key.id, wallet.id, id);
       },
-      onRename: (id, label) => renameNode(id, label),
+      onRename: (id, label) => {
+        if (id !== EMPTY_CARD) renameNode(id, label);
+      },
     });
   }
 
