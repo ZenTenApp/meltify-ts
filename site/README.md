@@ -48,13 +48,16 @@ Three nested browser-style tab strips, in order:
 | 3 | Cards (BIP39 passphrases) | `+ Add card` / `+` | draft tab body: **secret** (the 25th word, masked, optional) and **name** |
 
 Rows 2 and 3 are disabled until a key exists and are hidden while a fixed
-section is showing. Each of those rows starts with an immutable **empty tab**:
+section is showing. Row 3 does not need a wallet: with the empty wallet tab
+selected, a card hangs off the key itself and derives the source identity with
+that BIP39 passphrase, which is what `meltify-info` does when you pass a 25th
+word to a key. Each of those rows starts with an immutable **empty tab**:
 unlabelled, green, not closable and not renameable. It is the node *above* the
-row — the key with no wallet on row 2, the wallet with no card (the standard,
-empty BIP39 passphrase) on row 3 — and selecting it is how you get back to that
-identity once wallets or cards exist. Everything you type lives in the body
-under the strip, never inside a tab. Double-click a committed tab to rename
-it — the label only, never the secret.
+row — the key with no wallet on row 2, the wallet with no card (or the key with
+no card) on row 3 — and selecting it is how you get back to that identity once
+wallets or cards exist. Everything you type lives in the body under the strip,
+never inside a tab. Double-click a committed tab to rename it — the label only,
+never the secret.
 
 The deepest selected tab is the **leaf**, and the leaf's identity is the panel at
 the bottom: Report / Chains / meltify-info. A key with no wallet shows the source
@@ -90,6 +93,13 @@ draft tab open with the reason.
   phrases, the SSH key, Monero and Beldex alone. `@scure/bip39` applies NFKD itself,
   so the UI adds no normalisation of its own. An empty card is a real card: the
   standard derivation, the one `meltify-info` produces.
+- **Cards belong to an identity, not to a wallet.** A card list hangs off the
+  selected wallet, and off the key itself when the empty wallet tab is selected:
+  the passphrase applies to whatever identity is showing, and a 25th word moves
+  nothing but BIP39-seeded rows, so no subaccount is needed to be a real
+  derivation. The duplicate rule is scoped the same way — the same passphrase may
+  exist once on a wallet and once on the key, because the seeds they act on
+  differ.
 - **The BIP39 passphrase is optional too, and recommended the same way.** It is fed
   to the PBKDF2 step in `buildIdentityReport({ bip39Passphrase })`, so it moves the
   Nostr keys and the 28 BIP39-seeded address rows and leaves the seed, the phrases,

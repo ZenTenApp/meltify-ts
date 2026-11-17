@@ -68,16 +68,17 @@ export function mountKeySpace(key: KeyTab): KeySpace {
     return form;
   };
 
-  const cardForm = (wallet: WalletTab, card: CardTab): HTMLElement => {
+  const cardForm = (wallet: WalletTab | null, card: CardTab): HTMLElement => {
     const cached = forms.get(card.id);
     if (cached !== undefined) return cached;
+    const walletId = wallet?.id ?? null;
     const form = mountNodeForm({
       kind: 'card',
-      parent: `wallet “${wallet.label}”`,
+      parent: wallet === null ? `the “${key.label}” key` : `wallet “${wallet.label}”`,
       initialLabel: card.label,
       initialSecret: card.secret,
       onSubmit: (secret, label) => {
-        const error = commitCard(key.id, wallet.id, card.id, secret, label);
+        const error = commitCard(key.id, walletId, card.id, secret, label);
         if (error === null) {
           forgetForm(card.id);
           toast(`Card “${label === '' ? card.label : label}” added`);
@@ -86,7 +87,7 @@ export function mountKeySpace(key: KeyTab): KeySpace {
       },
       onCancel: () => {
         forgetForm(card.id);
-        removeCard(key.id, wallet.id, card.id);
+        removeCard(key.id, walletId, card.id);
       },
     });
     forms.set(card.id, form);
@@ -176,16 +177,21 @@ export function mountKeySpace(key: KeyTab): KeySpace {
   };
 
   const renderCardPanel = (current: KeyTab, wallet: WalletTab | null): void => {
-    if (wallet === null || wallet.status !== 'ready') {
+    // A draft wallet has nothing to attach a card to yet; no wallet is fine — the
+    // card then belongs to the key itself.
+    if (wallet !== null && wallet.status !== 'ready') {
       cardPanel.replaceChildren();
       return;
     }
-    const card = wallet.cards.find((entry) => entry.id === wallet.activeCard) ?? null;
+    const host = wallet ?? current;
+    const card = host.cards.find((entry) => entry.id === host.activeCard) ?? null;
     if (card === null) {
       cardPanel.replaceChildren(
         el('section', { class: 'card tight' }, [
           hint(
-            'Empty card selected. The panel below shows this wallet with the standard (empty) BIP39 passphrase — exactly what every wallet matches. Add a card only for a wallet that uses a 25th word; the green tab in the card row comes back here.',
+            wallet === null
+              ? 'Empty card selected. The panel below shows this key on its own with the standard (empty) BIP39 passphrase. Add a card to derive it with a 25th word instead: no subaccount is involved.'
+              : 'Empty card selected. The panel below shows this wallet with the standard (empty) BIP39 passphrase — exactly what every wallet matches. Add a card only for a wallet that uses a 25th word; the green tab in the card row comes back here.',
           ),
         ]),
       );
@@ -205,7 +211,7 @@ export function mountKeySpace(key: KeyTab): KeySpace {
               class: 'btn ghost small',
               onclick: () => {
                 forgetForm(card.id);
-                removeCard(current.id, wallet.id, card.id);
+                removeCard(current.id, wallet?.id ?? null, card.id);
                 toast('Card tab closed');
               },
             }, ['Close card tab']),

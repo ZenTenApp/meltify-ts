@@ -75,7 +75,9 @@ export function mountLeaf(ctx: Ctx): LeafPanel {
     status.replaceChildren();
 
     if (info !== null) {
-      const path: { text: string; leaf: boolean }[] = [{ text: info.key.label, leaf: info.wallet === null }];
+      const path: { text: string; leaf: boolean }[] = [
+        { text: info.key.label, leaf: info.wallet === null && info.card === null },
+      ];
       if (info.wallet !== null) path.push({ text: info.wallet.label, leaf: info.card === null });
       if (info.card !== null) path.push({ text: info.card.label, leaf: true });
       for (const [index, part] of path.entries()) {

@@ -214,8 +214,12 @@ function main(): void {
   function renderCardStrip(key: KeyTab | null, wallet: WalletTab | null): void {
     cardStrip.root.hidden = key === null;
     if (key === null) return;
-    const ready = key.status === 'ready' && wallet !== null && wallet.status === 'ready';
-    const cards = wallet?.cards ?? [];
+    // Cards hang off the selected wallet, or off the key itself when no wallet is
+    // selected. Only a draft wallet blocks them.
+    const host = wallet ?? key;
+    const walletId = wallet?.id ?? null;
+    const ready = key.status === 'ready' && (wallet === null || wallet.status === 'ready');
+    const cards = host.cards;
     const cardTabs = cards.map((card) => ({
       id: card.id,
       label: card.label,
@@ -240,25 +244,25 @@ function main(): void {
         },
         ...cardTabs,
       ],
-      activeId: wallet?.activeCard ?? EMPTY_CARD,
+      activeId: host.activeCard ?? EMPTY_CARD,
       addLabel: cardTabs.length === 0 ? '+ Add card' : '+',
       addTitle: 'Add card',
       disabled: !ready,
       disabledNote: !ready
-        ? wallet === null
-          ? 'pick a wallet first'
-          : 'create the wallet first'
+        ? key.status === 'ready'
+          ? 'create the wallet first'
+          : 'add a key first'
         : undefined,
       onSelect: (id) => {
-        if (wallet !== null) selectCard(key.id, wallet.id, id === EMPTY_CARD ? null : id);
+        selectCard(key.id, walletId, id === EMPTY_CARD ? null : id);
       },
       onAdd: () => {
-        if (wallet !== null) addCardDraft(key.id, wallet.id);
+        addCardDraft(key.id, walletId);
       },
       onClose: (id) => {
         if (id === EMPTY_CARD) return;
         spaces.get(key.id)?.forget(id);
-        if (wallet !== null) removeCard(key.id, wallet.id, id);
+        removeCard(key.id, walletId, id);
       },
       onRename: (id, label) => {
         if (id !== EMPTY_CARD) renameNode(id, label);

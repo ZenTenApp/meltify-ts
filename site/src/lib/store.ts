@@ -62,6 +62,13 @@ export interface KeyTab extends NodeBase {
   source: string;
   wallets: WalletTab[];
   activeWallet: string | null;
+  /**
+   * Cards on the key itself, for the tab with no subaccount. A BIP39 passphrase
+   * applies to whichever identity is selected, and `meltify-info` can derive the
+   * key with a 25th word without any subaccount, so the key needs its own list.
+   */
+  cards: CardTab[];
+  activeCard: string | null;
 }
 
 export type SectionId = 'selfcheck' | 'keytools' | 'phrases';
@@ -110,6 +117,8 @@ function draftKey(pem = '', passphrase = '', source = ''): KeyTab {
     error: null,
     wallets: [],
     activeWallet: null,
+    cards: [],
+    activeCard: null,
   };
 }
 
@@ -149,6 +158,8 @@ function findKey(id: string): KeyTab | undefined {
 export function findNode(id: string): KeyTab | WalletTab | CardTab | undefined {
   for (const key of state.keys) {
     if (key.id === id) return key;
+    const keyCard = key.cards.find((entry) => entry.id === id);
+    if (keyCard !== undefined) return keyCard;
     for (const wallet of key.wallets) {
       if (wallet.id === id) return wallet;
       const card = wallet.cards.find((entry) => entry.id === id);
@@ -164,13 +175,19 @@ export function activeKey(state: AppState): KeyTab | null {
 
 /**
  * Deepest node on the active path. A ready key with no wallet shows the source
- * identity; a wallet with no card shows the subaccount identity.
+ * identity — or, if a card is selected on the key itself, the source identity
+ * with that BIP39 passphrase. A wallet with no card shows the subaccount
+ * identity.
  */
 export function leafOf(appState: AppState): LeafInfo | null {
   const key = activeKey(appState);
   if (key === null) return null;
   const wallet = key.wallets.find((entry) => entry.id === key.activeWallet) ?? null;
-  if (wallet === null) return { key, wallet: null, card: null, node: key, kind: 'key' };
+  if (wallet === null) {
+    const card = key.cards.find((entry) => entry.id === key.activeCard) ?? null;
+    if (card === null) return { key, wallet: null, card: null, node: key, kind: 'key' };
+    return { key, wallet: null, card, node: card, kind: 'card' };
+  }
   const card = wallet.cards.find((entry) => entry.id === wallet.activeCard) ?? null;
   if (card === null) return { key, wallet, card: null, node: wallet, kind: 'wallet' };
   return { key, wallet, card, node: card, kind: 'card' };
@@ -208,13 +225,13 @@ export function selectWallet(keyId: string, walletId: string | null): void {
   });
 }
 
-export function selectCard(keyId: string, walletId: string, cardId: string | null): void {
+export function selectCard(keyId: string, walletId: string | null, cardId: string | null): void {
   update((draft) => {
-    const wallet = draft.keys
-      .find((entry) => entry.id === keyId)
-      ?.wallets.find((entry) => entry.id === walletId);
-    if (wallet === undefined) return;
-    wallet.activeCard = cardId;
+    const key = draft.keys.find((entry) => entry.id === keyId);
+    if (key === undefined) return;
+    const host = walletId === null ? key : key.wallets.find((entry) => entry.id === walletId);
+    if (host === undefined) return;
+    host.activeCard = cardId;
   });
 }
 
@@ -389,17 +406,44 @@ export function removeWallet(keyId: string, walletId: string): void {
  * Cards
  * ------------------------------------------------------------------ */
 
-export function addCardDraft(keyId: string, walletId: string): string | null {
-  const wallet = findKey(keyId)?.wallets.find((entry) => entry.id === walletId);
-  if (wallet === undefined || wallet.status !== 'ready') return null;
-  const existing = wallet.cards.find((card) => card.status === 'draft');
+/**
+ * Where a card lives. Cards hang off a wallet, or off the key itself when no
+ * wallet is selected: the same passphrase applies to whichever identity is
+ * showing, and it needs no subaccount to be a real derivation.
+ */
+interface CardHost {
+  cards: CardTab[];
+  activeCard: string | null;
+  /** `null` for the key's own cards. */
+  walletId: string | null;
+  /** What the duplicate message calls the owner: "this wallet" / "this key". */
+  noun: string;
+}
+
+function cardHost(keyId: string, walletId: string | null): CardHost | undefined {
+  const key = findKey(keyId);
+  if (key === undefined) return undefined;
+  if (walletId === null) {
+    return key.status === 'ready'
+      ? { cards: key.cards, activeCard: key.activeCard, walletId: null, noun: 'key' }
+      : undefined;
+  }
+  const wallet = key.wallets.find((entry) => entry.id === walletId);
+  if (wallet === undefined || wallet.status !== 'ready') return undefined;
+  return { cards: wallet.cards, activeCard: wallet.activeCard, walletId, noun: 'wallet' };
+}
+
+export function addCardDraft(keyId: string, walletId: string | null): string | null {
+  const host = cardHost(keyId, walletId);
+  if (host === undefined) return null;
+  const existing = host.cards.find((card) => card.status === 'draft');
   if (existing !== undefined) {
     selectCard(keyId, walletId, existing.id);
     return existing.id;
   }
   const card: CardTab = {
     id: nid('c'),
-    label: `Card ${wallet.cards.length + 1}`,
+    label: `Card ${host.cards.length + 1}`,
     secret: '',
     status: 'draft',
     identity: null,
@@ -407,9 +451,9 @@ export function addCardDraft(keyId: string, walletId: string): string | null {
     error: null,
   };
   update((draft) => {
-    const target = draft.keys
-      .find((entry) => entry.id === keyId)
-      ?.wallets.find((entry) => entry.id === walletId);
+    const key = draft.keys.find((entry) => entry.id === keyId);
+    if (key === undefined) return;
+    const target = walletId === null ? key : key.wallets.find((entry) => entry.id === walletId);
     if (target === undefined) return;
     target.cards.push(card);
     target.activeCard = card.id;
@@ -419,25 +463,25 @@ export function addCardDraft(keyId: string, walletId: string): string | null {
 
 export function commitCard(
   keyId: string,
-  walletId: string,
+  walletId: string | null,
   cardId: string,
   secret: string,
   label: string,
 ): string | null {
-  const wallet = findKey(keyId)?.wallets.find((entry) => entry.id === walletId);
-  if (wallet === undefined) return 'That tab is gone.';
-  const duplicate = wallet.cards.find(
+  const host = cardHost(keyId, walletId);
+  if (host === undefined) return 'That tab is gone.';
+  const duplicate = host.cards.find(
     (entry) => entry.id !== cardId && entry.status === 'ready' && entry.secret === secret,
   );
   if (duplicate !== undefined) {
     return secret === ''
-      ? `This wallet already has a card with no passphrase (“${duplicate.label}”).`
-      : `A card with that passphrase already exists (“${duplicate.label}”).`;
+      ? `This ${host.noun} already has a card with no passphrase (“${duplicate.label}”).`
+      : `A card with that passphrase already exists on this ${host.noun} (“${duplicate.label}”).`;
   }
   update((draft) => {
-    const target = draft.keys
-      .find((entry) => entry.id === keyId)
-      ?.wallets.find((entry) => entry.id === walletId);
+    const key = draft.keys.find((entry) => entry.id === keyId);
+    if (key === undefined) return;
+    const target = walletId === null ? key : key.wallets.find((entry) => entry.id === walletId);
     const card = target?.cards.find((entry) => entry.id === cardId);
     if (target === undefined || card === undefined) return;
     card.secret = secret;
@@ -449,14 +493,14 @@ export function commitCard(
   return null;
 }
 
-export function removeCard(keyId: string, walletId: string, cardId: string): void {
+export function removeCard(keyId: string, walletId: string | null, cardId: string): void {
   update((draft) => {
-    const wallet = draft.keys
-      .find((entry) => entry.id === keyId)
-      ?.wallets.find((entry) => entry.id === walletId);
-    if (wallet === undefined) return;
-    wallet.cards = wallet.cards.filter((entry) => entry.id !== cardId);
-    if (wallet.activeCard === cardId) wallet.activeCard = wallet.cards.at(-1)?.id ?? null;
+    const key = draft.keys.find((entry) => entry.id === keyId);
+    if (key === undefined) return;
+    const target = walletId === null ? key : key.wallets.find((entry) => entry.id === walletId);
+    if (target === undefined) return;
+    target.cards = target.cards.filter((entry) => entry.id !== cardId);
+    if (target.activeCard === cardId) target.activeCard = target.cards.at(-1)?.id ?? null;
   });
 }
 
