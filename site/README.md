@@ -43,8 +43,8 @@ Three nested browser-style tab strips, in order:
 
 | Row | Strip | `+` behaviour | Body below it |
 | --- | --- | --- | --- |
-| 1 | Fixed sections (Self-check, Key tools, Phrase lab) │ SSH key tabs | opens a key draft tab; labelled `+` only when there is nothing yet — the draft tab itself reads **Add SSH Key** and is selected on load | key form: file drop or paste, passphrase, tab name; **Add SSH key** unlocks in the worker. *Try a throwaway key* uses the pinned seed `00..1f` or a random one |
-| 2 | Wallets (subaccounts) | `+ Add wallet` on an empty row, `+` after that | draft tab body: **secret** (the subaccount string, hashed verbatim) and **name** |
+| 1 | Fixed sections (Self-check, Key tools, Phrase lab) │ SSH key tabs | opens a key draft tab; labelled `+` only when there is nothing yet — the draft tab itself reads **Add SSH Key** and is selected on load | key form: file drop or paste, passphrase, tab name; **Add SSH key** unlocks in the worker |
+| 2 | Wallets (subaccounts) | `+ Add wallet` on an empty row, `+` after that | draft tab body: **private name** (the subaccount string, hashed verbatim) and **public name** |
 | 3 | Cards (BIP39 passphrases) | `+ Add card` / `+` | draft tab body: **secret** (the 25th word, masked, optional) and **name** |
 
 Rows 2 and 3 are disabled until a key exists and are hidden while a fixed
@@ -80,13 +80,14 @@ draft tab open with the reason.
 - **Masking is cosmetic and per field.** Seed, phrase, nsec, and the private-key
   body each carry their own reveal button on the Report tab, but they are plain
   strings in memory — same caveat as the terminal tool.
-- **A wallet tab is a subaccount, and its secret is hashed verbatim.** The wallet
-  secret is exactly the `--subaccount` string: `seed = SHA256(SHA256(utf8(secret)) ‖
-  key seed)`, re-encoded with the key's passphrase at bcrypt rounds 1. The UI never
-  trims it and never normalises it, because `meltify-info` hashes exactly these
-  bytes — `work ` and `work` are different wallets, and the form says so when it
-  sees whitespace or non-ASCII. The wallet *name* is display only and can be
-  changed at any time.
+- **A wallet tab is a subaccount, and its private name is hashed verbatim.** The
+  private name is exactly the `--subaccount` string: `seed = SHA256(SHA256(utf8(private name)) ‖
+  key seed)`, re-encoded with the key's passphrase at bcrypt rounds 1. The UI
+  never trims it and never normalises it, because `meltify-info` hashes exactly
+  these bytes — `work ` and `work` are different wallets, and the form says so
+  when it sees whitespace or non-ASCII. The public name is display only, can be
+  changed at any time, and defaults to the last four characters of the derived
+  wallet npub once the derivation lands (a name you typed is never overwritten).
 - **A card tab is the BIP39 passphrase, and hiding it is the only difference.**
   Cards feed the PBKDF2 step in `buildIdentityReport({ bip39Passphrase })`, so they
   move the Nostr keys and the 28 BIP39-seeded address rows and leave the seed, the
@@ -176,10 +177,10 @@ Then check:
 2. DevTools → Network shows exactly two requests after load (no third parties).
 3. Response headers include the `Content-Security-Policy` from `.htaccess`.
    cPanel needs `mod_headers` enabled (it is on standard cPanel/Apache builds).
-4. **Try a throwaway key** works, and so does adding a wallet and a card under
-   it — those need `crypto.getRandomValues`, which is available over http too, but
-   serve over HTTPS anyway: without a secure context the clipboard falls back to
-   the legacy path.
+4. Adding a wallet and a card under a key works — those need
+   `crypto.getRandomValues` only for the key form, which is available over http
+   too, but serve over HTTPS anyway: without a secure context the clipboard falls
+   back to the legacy path.
 
 The worker is a separate file under `assets/`. If your host blocks or mangles
 module workers, the symlink-free fix is to keep `assets/` intact and confirm
@@ -190,7 +191,7 @@ module workers, the symlink-free fix is to keep `assets/` intact and confirm
 `npm run verify` includes `site:typecheck`. Beyond that, the built bundle was
 booted in jsdom with a stubbed worker and driven through the real click paths:
 strip order and defaults, the disabled rows below a key, section switching, key
-commit, wallet/card drafts, the empty-secret and duplicate refusals, the
+commit, wallet/card drafts, the empty-private-name and duplicate refusals, the
 whitespace warning, tab rename, tab close and the global wipe. The built worker
 bundle also runs against the golden seed: 46/47 self-check rows pass, the 47th
 ("no Buffer global") is browser-only and fails under Node by design.

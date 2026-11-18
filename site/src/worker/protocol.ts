@@ -20,14 +20,6 @@ export type WorkerRequest =
       bip39Passphrase: string;
       subaccount?: string;
     }
-  | {
-      id: number;
-      op: 'throwaway';
-      seedHex: string;
-      passphrase: string;
-      bip39Passphrase: string;
-      subaccount?: string;
-    }
   | { id: number; op: 'marshal'; seedHex: string; passphrase: string; rounds: MarshalRounds }
   | { id: number; op: 'selfcheck' };
 
@@ -45,15 +37,6 @@ export type WorkerResult =
       bip39Passphrase: string;
       /** Re-encoded subaccount PEM; absent when no subaccount was requested. */
       pem?: string;
-      elapsedMs: number;
-    }
-  | {
-      op: 'throwaway';
-      report: IdentityReport;
-      seedHex: string;
-      pem: string;
-      subaccount: string;
-      bip39Passphrase: string;
       elapsedMs: number;
     }
   | { op: 'marshal'; pem: string; keyBodyB64: string; elapsedMs: number }

@@ -1,13 +1,15 @@
 /**
- * Draft body for a wallet or a card: the secret and the label, side by side.
+ * Draft body for a wallet or a card: its private name and its public name, side
+ * by side.
  *
- * Both rows are the same shape — secret is the derivation input, label is
- * display only — but the byte rules differ:
+ * Both rows are the same shape — the private name is the derivation input, the
+ * public name is display only — but the byte rules differ:
  *
- *   wallet secret  the subaccount string, hashed verbatim. Never trimmed, never
- *                  normalised, because meltify-info hashes exactly these bytes.
- *   card secret    the BIP39 passphrase. @scure/bip39 applies NFKD itself, the
- *                  same as the spec and every wallet; we add nothing.
+ *   wallet private name  the subaccount string, hashed verbatim. Never trimmed,
+ *                        never normalised, because meltify-info hashes exactly
+ *                        these bytes.
+ *   card private name    the BIP39 passphrase. @scure/bip39 applies NFKD itself,
+ *                        the same as the spec and every wallet; we add nothing.
  *
  * The form is kept mounted per draft, so tab switching does not lose typing.
  */
@@ -28,7 +30,7 @@ export interface NodeFormOptions {
 function looksUnusual(secret: string): string | null {
   if (secret === '') return null;
   if (/^\s|\s$/.test(secret)) {
-    return 'Leading or trailing whitespace — those bytes are hashed too, so this is a different wallet from the trimmed string.';
+    return 'Leading or trailing whitespace — those bytes are hashed too, so this is a different wallet from the trimmed name.';
   }
   if (/[^\x20-\x7e]/.test(secret)) {
     return 'Non-ASCII characters — hashed byte-for-byte. A composed and a decomposed accent give different wallets.';
@@ -43,14 +45,16 @@ export function mountNodeForm(options: NodeFormOptions): HTMLElement {
     autocomplete: 'off',
     spellcheck: 'false',
     value: options.initialSecret ?? '',
-    placeholder: wallet ? 'wallet secret — hashed byte-for-byte' : 'BIP39 passphrase (25th word), or empty',
+    placeholder: wallet
+      ? 'private name — hashed byte-for-byte'
+      : 'BIP39 passphrase (25th word), or empty',
   });
   const label = el('input', {
     type: 'text',
     autocomplete: 'off',
     spellcheck: 'false',
     value: options.initialLabel,
-    placeholder: wallet ? 'Wallet name' : 'Card name',
+    placeholder: wallet ? 'public name — defaults to the last 4 of the npub' : 'Card name',
   });
   const reveal = el('button', { type: 'button', class: 'btn ghost small' }, ['show']);
   const create = el('button', { type: 'button', class: 'btn primary' }, [
@@ -63,7 +67,7 @@ export function mountNodeForm(options: NodeFormOptions): HTMLElement {
   const byteRule = (): HTMLElement => {
     if (wallet) {
       return hint(
-        'The wallet secret is the subaccount string: seed = SHA256(SHA256(utf8(secret)) ‖ key seed). It is hashed exactly as typed, so `work `, `work`, and `wörk` are three different wallets. The name is display only and can be changed later.',
+        'The private name is the subaccount string: seed = SHA256(SHA256(utf8(private name)) ‖ key seed). It is hashed exactly as typed, so `work `, `work`, and `wörk` are three different wallets. The public name is display only, defaults to the last four characters of the wallet’s npub, and can be changed later.',
       );
     }
     return hint(
@@ -117,11 +121,15 @@ export function mountNodeForm(options: NodeFormOptions): HTMLElement {
     byteRule(),
     el('div', { class: 'split', style: 'margin-top: 14px' }, [
       el('label', { class: 'field' }, [
-        el('span', { class: 'label' }, [wallet ? 'secret (required)' : 'secret (optional)']),
+        el(
+          'span',
+          { class: 'label' },
+          [wallet ? 'private name (required)' : 'secret (optional)'],
+        ),
         el('div', { class: 'row tight' }, [secret, ...(wallet ? [] : [reveal])]),
       ]),
       el('label', { class: 'field' }, [
-        el('span', { class: 'label' }, ['name']),
+        el('span', { class: 'label' }, [wallet ? 'public name' : 'name']),
         label,
       ]),
     ]),

@@ -9,13 +9,8 @@
 
 import { MeltifyError, isUnprotectedKey } from 'meltify-ts';
 import { el, hint, message, toast } from '../lib/dom.ts';
-import { toHex } from '../lib/hex.ts';
 import { commitKey, type Identity, type KeyTab } from '../lib/store.ts';
-import { THROWAWAY_PASSPHRASE } from '../lib/throwaway.ts';
-import { deriveFromKey, deriveThrowaway, WorkerCallError } from '../lib/worker-client.ts';
-
-/** Pinned by the Go suite; "pin golden seed" makes the throwaway run reproducible. */
-const GOLDEN_SEED_HEX = '000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f';
+import { deriveFromKey, WorkerCallError } from '../lib/worker-client.ts';
 
 const ERROR_HELP: Record<string, string> = {
   'key-not-password-protected': 'This key has no passphrase. meltify only accepts protected keys.',
@@ -78,12 +73,7 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
   });
   const sourceLabel = el('span', { class: 'hint' }, [key.source]);
   const revealPass = el('button', { type: 'button', class: 'btn ghost small' }, ['show']);
-  const note = el('p', { class: 'hint tight', hidden: true }, [
-    `Throwaway key passphrase: ${THROWAWAY_PASSPHRASE} — fixed and public, shown so you can reproduce the run.`,
-  ]);
   const addButton = el('button', { type: 'button', class: 'btn primary' }, ['Add SSH key']);
-  const throwawayButton = el('button', { type: 'button', class: 'btn' }, ['Try a throwaway key']);
-  const pinGolden = el('input', { type: 'checkbox', checked: true });
   const notice = el('div');
 
   const setVisible = (visible: boolean): void => {
@@ -93,7 +83,6 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
 
   const applyKeyText = (text: string): void => {
     keyText.value = text.trim();
-    note.hidden = true;
     setVisible(false);
     notice.replaceChildren();
   };
@@ -150,7 +139,7 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
     notice.replaceChildren();
     const pem = keyText.value.trim();
     if (pem.length === 0) {
-      notice.replaceChildren(message('Paste a key, drop a file, or use “Try a throwaway key”.', 'warn'));
+      notice.replaceChildren(message('Paste a key or drop a key file.', 'warn'));
       return;
     }
     if (looksUnprotected(pem)) {
@@ -190,50 +179,8 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
     }
   }
 
-  async function throwaway(): Promise<void> {
-    notice.replaceChildren();
-    throwawayButton.disabled = true;
-    throwawayButton.textContent = 'Building key…';
-    try {
-      let seedHex = GOLDEN_SEED_HEX;
-      if (!pinGolden.checked) {
-        const seed = new Uint8Array(32);
-        crypto.getRandomValues(seed);
-        seedHex = toHex(seed);
-      }
-      const result = await deriveThrowaway(seedHex, THROWAWAY_PASSPHRASE, '', '');
-      keyText.value = result.pem;
-      passphrase.value = THROWAWAY_PASSPHRASE;
-      note.hidden = false;
-      setVisible(true);
-      const source = pinGolden.checked ? 'throwaway key (seed 00..1f)' : 'throwaway key (random)';
-      sourceLabel.textContent = source;
-      const error = commitKey(key.id, {
-        pem: result.pem,
-        passphrase: THROWAWAY_PASSPHRASE,
-        source,
-        label: name.value.trim(),
-        identity: identityOf(result, source),
-      });
-      if (error !== null) {
-        notice.replaceChildren(message(error, 'err'));
-        return;
-      }
-      toast('Throwaway key added');
-      onCommitted(key.id);
-    } catch (error) {
-      notice.replaceChildren(message(failureText(error), 'err'));
-    } finally {
-      throwawayButton.disabled = false;
-      throwawayButton.textContent = 'Try a throwaway key';
-    }
-  }
-
   addButton.addEventListener('click', () => {
     void add();
-  });
-  throwawayButton.addEventListener('click', () => {
-    void throwaway();
   });
   passphrase.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
@@ -267,12 +214,7 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
         name,
       ]),
     ]),
-    note,
-    el('div', { class: 'row' }, [
-      addButton,
-      throwawayButton,
-      el('label', { class: 'switch' }, [pinGolden, el('span', {}, ['pin seed 00..1f'])]),
-    ]),
+    el('div', { class: 'row' }, [addButton]),
     notice,
   ]);
 }

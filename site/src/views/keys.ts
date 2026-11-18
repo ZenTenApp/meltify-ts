@@ -21,7 +21,7 @@ export function mountKeys(ctx: Ctx): HTMLElement {
   const confirm = el('input', { type: 'password', autocomplete: 'new-password', placeholder: 'repeat passphrase' });
   const rounds = el('select', {}, [
     el('option', { value: '16', selected: true }, ['bcrypt rounds 16 (OpenSSH default)']),
-    el('option', { value: '1' }, ['bcrypt rounds 1 (fast, throwaway only)']),
+    el('option', { value: '1' }, ['bcrypt rounds 1 (fast; for testing only)']),
   ]);
   const generate = el('button', { type: 'button', class: 'btn primary' }, ['Generate key']);
   const output = el('div');

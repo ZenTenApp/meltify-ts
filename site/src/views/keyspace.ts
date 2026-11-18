@@ -49,7 +49,9 @@ export function mountKeySpace(key: KeyTab): KeySpace {
     const form = mountNodeForm({
       kind: 'wallet',
       parent: `the “${key.label}” key`,
-      initialLabel: wallet.label,
+      // A placeholder label is not a name: leave the field empty so the hint
+      // about the npub suffix applies, and the first derivation can fill it in.
+      initialLabel: wallet.labelAuto ? '' : wallet.label,
       initialSecret: wallet.secret,
       onSubmit: (secret, label) => {
         const error = commitWallet(key.id, wallet.id, secret, label);
@@ -139,7 +141,7 @@ export function mountKeySpace(key: KeyTab): KeySpace {
       walletPanel.replaceChildren(
         el('section', { class: 'card tight' }, [
           hint(
-            'Empty wallet selected. “+ Add wallet” names a subaccount: a different, deterministic key derived from this one, with its own cards and its own identity below. The green tab in the wallet row comes back here.',
+            'Empty wallet selected. “+ Add wallet” names a subaccount: a different, deterministic key derived from this one, with its own cards and its own identity below. The first tab in the wallet row — this one — is the key itself.',
           ),
         ]),
       );
@@ -166,9 +168,9 @@ export function mountKeySpace(key: KeyTab): KeySpace {
           ]),
         ]),
         el('div', { class: 'blocks', style: 'margin-top: 12px' }, [
-          valueBlock('subaccount secret', wallet.secret, {
+          valueBlock('private name', wallet.secret, {
             masked: true,
-            note: 'hashed verbatim: SHA256(SHA256(utf8(secret)) ‖ key seed)',
+            note: 'hashed verbatim: SHA256(SHA256(utf8(private name)) ‖ key seed) — the public name is display only',
           }),
         ]),
         hint('Cards below hold the BIP39 passphrase for this wallet. Add one per wallet you use.'),

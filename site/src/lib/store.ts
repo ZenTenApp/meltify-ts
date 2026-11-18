@@ -49,8 +49,17 @@ export interface CardTab extends NodeBase {
 }
 
 export interface WalletTab extends NodeBase {
-  /** Subaccount string, hashed byte-for-byte. Never trimmed, never normalised. */
+  /**
+   * Private name: the subaccount string, hashed byte-for-byte. It is the
+   * derivation input, never trimmed and never normalised.
+   */
   secret: string;
+  /**
+   * True while the public name is still a placeholder, so the first successful
+   * derivation may replace it with the last four characters of the npub. A name
+   * the user typed is never overwritten.
+   */
+  labelAuto: boolean;
   cards: CardTab[];
   activeCard: string | null;
 }
@@ -347,6 +356,7 @@ export function addWalletDraft(keyId: string): string | null {
     id: nid('w'),
     label: `Wallet ${key.wallets.length + 1}`,
     secret: '',
+    labelAuto: true,
     status: 'draft',
     identity: null,
     deriving: false,
@@ -367,13 +377,13 @@ export function commitWallet(keyId: string, walletId: string, secret: string, la
   const wallet = key?.wallets.find((entry) => entry.id === walletId);
   if (key === undefined || wallet === undefined) return 'That tab is gone.';
   if (secret === '') {
-    return 'The wallet secret is required. With no secret there is no subaccount — that identity is the key itself.';
+    return 'The private name is required. With no name there is no subaccount — that identity is the key itself.';
   }
   const duplicate = key.wallets.find(
     (entry) => entry.id !== walletId && entry.status === 'ready' && entry.secret === secret,
   );
   if (duplicate !== undefined) {
-    return `A wallet with that secret already exists in this key (“${duplicate.label}”). Secrets are hashed byte-for-byte, so even invisible whitespace counts.`;
+    return `A wallet with that private name already exists in this key (“${duplicate.label}”). Private names are hashed byte-for-byte, so even invisible whitespace counts.`;
   }
   update((draft) => {
     const target = draft.keys
@@ -383,6 +393,7 @@ export function commitWallet(keyId: string, walletId: string, secret: string, la
     target.secret = secret;
     target.status = 'ready';
     target.error = null;
+    target.labelAuto = label === '';
     const taken = new Set(
       (draft.keys.find((entry) => entry.id === keyId)?.wallets ?? [])
         .filter((entry) => entry.id !== walletId)
@@ -516,7 +527,12 @@ export function renameNode(id: string, label: string): void {
     if (node === undefined) return;
     if (node.status === 'draft' && 'pem' in node) return; // a key draft has no name yet
     node.label = trimmed;
+    if (isWallet(node)) node.labelAuto = false;
   });
+}
+
+function isWallet(node: KeyTab | WalletTab | CardTab): node is WalletTab {
+  return 'cards' in node && 'secret' in node;
 }
 
 export function setDeriving(id: string, value: boolean): void {
@@ -527,12 +543,21 @@ export function setDeriving(id: string, value: boolean): void {
 }
 
 export function setDerived(id: string, identity: Identity): void {
-  update(() => {
+  update((draft) => {
     const node = findNode(id);
     if (node === undefined) return;
     node.identity = identity;
     node.error = null;
     node.deriving = false;
+    if (!isWallet(node) || !node.labelAuto) return;
+    // The public name of a wallet nobody named: the last four characters of its
+    // npub. The wallet's own npub (no card) is stable, so this lands once.
+    const key = draft.keys.find((entry) => entry.wallets.includes(node));
+    const taken = new Set(
+      (key?.wallets ?? []).filter((entry) => entry.id !== node.id).map((entry) => entry.label),
+    );
+    node.label = uniqueLabel(identity.report.npub.slice(-4), taken);
+    node.labelAuto = false;
   });
 }
 

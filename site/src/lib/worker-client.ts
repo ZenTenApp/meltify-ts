@@ -87,18 +87,6 @@ export async function deriveFromKey(
   >;
 }
 
-export async function deriveThrowaway(
-  seedHex: string,
-  passphrase: string,
-  bip39Passphrase: string,
-  subaccount = '',
-): Promise<Extract<WorkerResult, { op: 'throwaway' }>> {
-  return (await send({ op: 'throwaway', seedHex, passphrase, bip39Passphrase, subaccount })) as Extract<
-    WorkerResult,
-    { op: 'throwaway' }
-  >;
-}
-
 export async function marshalKey(
   seedHex: string,
   passphrase: string,
