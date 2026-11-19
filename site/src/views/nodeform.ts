@@ -54,7 +54,9 @@ export function mountNodeForm(options: NodeFormOptions): HTMLElement {
     autocomplete: 'off',
     spellcheck: 'false',
     value: options.initialLabel,
-    placeholder: wallet ? 'public name — defaults to the last 4 of the npub' : 'Card name',
+    placeholder: wallet
+      ? 'public name — defaults to the last 4 of the npub'
+      : 'card name — defaults to the last 4 of the npub',
   });
   const reveal = el('button', { type: 'button', class: 'btn ghost small' }, ['show']);
   const create = el('button', { type: 'button', class: 'btn primary' }, [
@@ -71,7 +73,7 @@ export function mountNodeForm(options: NodeFormOptions): HTMLElement {
       );
     }
     return hint(
-      'The card secret is the BIP39 passphrase, masked here and never trimmed. Leave it empty for the standard derivation — that is a real card, just the one every BIP39 wallet matches. The name is display only and can be changed later.',
+      'The card secret is the BIP39 passphrase, masked here and never trimmed. Leave it empty for the standard derivation — that is a real card, just the one every BIP39 wallet matches. The name is display only, defaults to the last four characters of the card’s npub, and can be changed later.',
     );
   };
 

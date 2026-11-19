@@ -11,4 +11,6 @@ export interface Ctx {
   newKey(pem?: string, passphrase?: string): void;
   /** Clear every tab, key, wallet, card and cached derivation. */
   wipe(): void;
+  /** Ask the relays again for this node's kind 0, ignoring what was already asked. */
+  searchProfiles(nodeId: string): void;
 }

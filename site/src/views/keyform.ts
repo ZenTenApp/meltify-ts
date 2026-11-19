@@ -69,7 +69,7 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
     type: 'text',
     autocomplete: 'off',
     spellcheck: 'false',
-    placeholder: 'optional tab name — defaults to the file name',
+    placeholder: 'optional tab name — defaults to the last 4 of the npub',
   });
   const sourceLabel = el('span', { class: 'hint' }, [key.source]);
   const revealPass = el('button', { type: 'button', class: 'btn ghost small' }, ['show']);
@@ -93,7 +93,6 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
     void file.text().then((text) => {
       applyKeyText(text);
       sourceLabel.textContent = file.name;
-      name.placeholder = file.name;
       if (looksUnprotected(text)) {
         notice.replaceChildren(message('This file has no passphrase — meltify will reject it.', 'warn'));
       }
@@ -120,7 +119,6 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
     void file.text().then((text) => {
       applyKeyText(text);
       sourceLabel.textContent = file.name;
-      name.placeholder = file.name;
     });
   });
   revealPass.addEventListener('click', () => setVisible(passphrase.type === 'password'));

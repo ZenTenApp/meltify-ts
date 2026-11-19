@@ -49,40 +49,76 @@ body {
   border-radius: 8px;
 }
 
-/* ---------- header ---------- */
+/* ---------- dock ----------
+   The brand, the utility sections and the controls live at the bottom, so the
+   first tab strip is flush with the top of the page. It sticks to the bottom of
+   the viewport, which keeps wipe reachable however far you have scrolled. */
 
-.top {
+.dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 12;
   display: flex;
   gap: 16px;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  max-width: 1080px;
   width: 100%;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 22px 20px 10px;
+  padding: 10px 20px;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid var(--border);
+}
+
+.dock__sections {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.dock__link {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.dock__link:hover {
+  color: var(--text);
+  background: var(--bg-2);
+}
+.dock__link--on {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--panel);
 }
 
 .brand {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
 .mark {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
-  border-radius: 9px;
+  border-radius: 8px;
   background: linear-gradient(160deg, #1f6feb, #0b3d91);
   color: #fff;
-  font-size: 17px;
+  font-size: 14px;
   box-shadow: 0 0 0 1px #2a3a52 inset;
 }
 
 .brand-text h1 {
-  font-size: 19px;
+  font-size: 14px;
   line-height: 1.2;
   margin: 0;
   letter-spacing: 0.01em;
@@ -91,12 +127,12 @@ body {
   color: var(--muted);
 }
 .tag {
-  margin: 2px 0 0;
+  margin: 1px 0 0;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 11px;
 }
 
-.topmeta {
+.dock__meta {
   display: flex;
   gap: 10px;
   align-items: center;
@@ -134,7 +170,7 @@ body {
 .strips {
   max-width: 1080px;
   width: 100%;
-  margin: 6px auto 0;
+  margin: 0 auto;
   padding: 0 12px;
   position: sticky;
   top: 0;
@@ -149,7 +185,7 @@ body {
   gap: 6px;
   border-top: 1px solid var(--border-soft);
   border-bottom: 1px solid var(--border-soft);
-  min-height: 34px;
+  min-height: 44px;
 }
 .strip + .strip {
   border-top: none;
@@ -167,11 +203,11 @@ body {
 }
 .strip--sub {
   padding-left: 10px;
-  min-height: 30px;
+  min-height: 38px;
 }
 .strip--minor {
   padding-left: 20px;
-  min-height: 27px;
+  min-height: 34px;
 }
 .strip--off {
   opacity: 0.5;
@@ -206,10 +242,10 @@ body {
   background: none;
   border: none;
   border-radius: 0;
-  padding: 9px 12px 7px;
+  padding: 14px 14px 12px;
   cursor: pointer;
   white-space: nowrap;
-  max-width: 15rem;
+  max-width: 17rem;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -229,9 +265,17 @@ body {
    the only thing it carries is the palette's public/unmasked colour: it names
    no secret and can be neither renamed nor closed. */
 .tab--plain {
-  min-width: 30px;
-  padding-left: 9px;
-  padding-right: 9px;
+  flex: 0 0 auto;
+  /* A finger-width target, no wider: the tab carries a dot, and the label it
+     would have carried lives in the tooltip. */
+  min-width: 3.25rem;
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+  text-align: center;
+}
+.strip--minor .tab--plain {
+  min-width: 3rem;
 }
 .tab--plain::before {
   content: '';
@@ -247,11 +291,6 @@ body {
 .tab--plain[aria-selected='true']::before {
   opacity: 1;
 }
-.strip--minor .tab--plain {
-  min-width: 24px;
-  padding-left: 7px;
-  padding-right: 7px;
-}
 .tab:disabled {
   cursor: default;
 }
@@ -260,15 +299,32 @@ body {
   margin-left: 4px;
 }
 
+/* A wallet's hashatar: 14px of the same 32×32 grid the generator produces, so
+   pixels stay square. Decorative — the label next to it is the name. */
+.tab__icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -2px;
+  image-rendering: pixelated;
+}
+.strip--minor .tab__icon {
+  width: 12px;
+  height: 12px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+
 .strip--sub .tab {
   font-size: 12.5px;
-  padding: 7px 10px 5px;
-  max-width: 12rem;
+  padding: 11px 12px 9px;
+  max-width: 14rem;
 }
 .strip--minor .tab {
   font-size: 11.5px;
-  padding: 5px 9px 4px;
-  max-width: 11rem;
+  padding: 9px 10px 7px;
+  max-width: 13rem;
 }
 
 .tab__x {
@@ -278,7 +334,7 @@ body {
   cursor: pointer;
   font-size: 13px;
   line-height: 1;
-  padding: 7px 9px;
+  padding: 11px 9px;
   margin: auto 0 auto -6px;
   min-width: 26px;
   border-radius: 3px;
@@ -303,7 +359,7 @@ body {
   border: none;
   border-bottom: 2px solid transparent;
   border-radius: 0;
-  padding: 9px 10px 7px;
+  padding: 14px 12px 12px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -316,11 +372,11 @@ body {
 }
 .strip--sub .tabadd {
   font-size: 12.5px;
-  padding: 7px 8px 5px;
+  padding: 11px 10px 9px;
 }
 .strip--minor .tabadd {
   font-size: 11.5px;
-  padding: 5px 8px 4px;
+  padding: 9px 9px 7px;
 }
 
 .tabsep {
@@ -334,13 +390,48 @@ body {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  padding: 9px 8px 7px;
+  padding: 14px 8px 12px;
   border: none;
   border-bottom: 2px solid var(--accent);
   border-radius: 0;
   background: var(--bg-2);
   color: var(--text);
   width: 10rem;
+}
+
+/* A shell strip divides its width evenly between every cell: each tab and the
+   trailing `+` get the same share. The list grows N times as fast as the single
+   `+` (`--strip-tabs`, set by the strip) over a zero gap, so one tab and the `+`
+   come out the same width; the remaining 6px gap between the two is the only
+   separation in the row. No `max-width` and `min-width: 0` let a tab shrink to
+   its share instead of scrolling, truncating a long label. The plain dot tab at
+   the head of the wallet and card rows is a full peer, not a fixed
+   finger-width column. The leaf panel's segmented control does not opt in. */
+.strip--fill > .strip__list {
+  flex: var(--strip-tabs, 1) 1 0;
+  gap: 0;
+}
+.strip--fill .tabitem {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.strip--fill .tab {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+  text-align: center;
+}
+.strip--fill .tab--plain {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+}
+.strip--fill > .tabadd {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------- layout ---------- */
@@ -350,7 +441,7 @@ main {
   max-width: 1080px;
   width: 100%;
   margin: 0 auto;
-  padding: 22px 20px 48px;
+  padding: 22px 20px 64px;
 }
 
 .view[hidden] {
@@ -721,7 +812,7 @@ code {
   max-width: 1080px;
   width: 100%;
   margin: 0 auto;
-  padding: 18px 20px 40px;
+  padding: 18px 20px 20px;
   border-top: 1px solid var(--border-soft);
   color: var(--muted);
   font-size: 12px;
@@ -863,4 +954,56 @@ code {
 }
 .crumb__sep {
   color: #46556a;
+}
+
+/* ---------- kind 0 metadata ----------
+   Pasted, never fetched: the page has no network, so a display name is exactly
+   what the user brings and is labelled local wherever it appears. */
+
+.k0box {
+  margin-top: 12px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 10px;
+}
+.k0box summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.k0box summary:hover {
+  color: var(--text);
+}
+.k0 {
+  width: 100%;
+  min-height: 88px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+/* ---------- kind 0 relay list ----------
+   Every relay in the last round, so "nothing found" says where it looked. */
+
+.relaylist {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.relaylist li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.relaylist .ok {
+  color: var(--public);
 }

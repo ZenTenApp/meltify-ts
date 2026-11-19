@@ -32,6 +32,41 @@ export interface Identity {
 /** `draft` = named but not committed; `ready` = has everything it needs to derive. */
 export type NodeStatus = 'draft' | 'ready';
 
+/**
+ * A kind 0 profile for a node: the name its own key advertises, when it was
+ * signed, and where this page got it. `verified` means the event's signature was
+ * checked against the node's pubkey; a pasted one never is.
+ */
+export interface Profile {
+  name: string;
+  /** kind 0 `created_at`, seconds. */
+  createdAt: number;
+  /** Relay host that served it, or 'paste'. */
+  via: string;
+  verified: boolean;
+}
+
+/** One relay's answer in the last kind 0 round. */
+export interface RelayAnswer {
+  relay: string;
+  state: 'ok' | 'error' | 'closed' | 'silent';
+  /** Kind 0 events it sent for a wanted author. */
+  events: number;
+  /** Of those, the ones that carried no display_name and no name. */
+  nameless: number;
+  detail?: string;
+}
+
+/** What the last kind 0 lookup for a node returned, per relay. */
+export interface ProfileSearch {
+  state: 'searching' | 'done';
+  /** When the round started, ms since epoch. */
+  at: number;
+  relays: RelayAnswer[];
+  /** True when a verified kind 0 with a display name was found for this node. */
+  named: boolean;
+}
+
 interface NodeBase {
   id: string;
   label: string;
@@ -41,6 +76,16 @@ interface NodeBase {
   deriving: boolean;
   /** Last derivation failure, shown in the leaf panel. */
   error: string | null;
+  /**
+   * True while the label is still a placeholder (`Wallet 2`, `Card 1`), so the
+   * first successful derivation may replace it with the npub tag, and a kind 0
+   * name may replace that. A name the user typed is never overwritten.
+   */
+  labelAuto: boolean;
+  /** Profile this node's key advertises, once a relay or a paste has supplied it. */
+  profile: Profile | null;
+  /** The last kind 0 lookup's outcome, so the panel can show where it looked. */
+  search: ProfileSearch | null;
 }
 
 export interface CardTab extends NodeBase {
@@ -54,12 +99,6 @@ export interface WalletTab extends NodeBase {
    * derivation input, never trimmed and never normalised.
    */
   secret: string;
-  /**
-   * True while the public name is still a placeholder, so the first successful
-   * derivation may replace it with the last four characters of the npub. A name
-   * the user typed is never overwritten.
-   */
-  labelAuto: boolean;
   cards: CardTab[];
   activeCard: string | null;
 }
@@ -124,10 +163,13 @@ function draftKey(pem = '', passphrase = '', source = ''): KeyTab {
     identity: null,
     deriving: false,
     error: null,
+    profile: null,
+    search: null,
     wallets: [],
     activeWallet: null,
     cards: [],
     activeCard: null,
+    labelAuto: false,
   };
 }
 
@@ -302,14 +344,62 @@ export function commitKey(id: string, input: CommitKeyInput): string | null {
     key.identity = input.identity;
     key.error = null;
     const taken = new Set(draft.keys.filter((entry) => entry.id !== id).map((entry) => entry.label));
-    key.label = uniqueLabel(input.label === '' ? defaultKeyLabel(input.source, draft.keys.length) : input.label, taken);
+    // Every kind of tab takes the same label: the name you typed, or the first
+    // four characters of the node's npub. The key has already derived, so it can
+    // take it now; wallets and cards take theirs when their derivation lands.
+    key.label = uniqueLabel(
+      input.label === '' ? npubLabel(input.identity) ?? `Key ${draft.keys.length}` : input.label,
+      taken,
+    );
+    key.labelAuto = input.label === '';
   });
   return null;
 }
 
-function defaultKeyLabel(source: string, count: number): string {
-  if (source !== '' && source !== 'pasted key') return source;
-  return `Key ${count}`;
+/**
+ * How a tab writes an npub it has no name for: `npub…wxyz`.
+ *
+ * It is the tail, not the head: every npub is bech32 with the human-readable
+ * prefix `npub`, so the first four characters are the same string for every key,
+ * wallet and card and would label them all "npub". The tail is also the part
+ * clients quote when they shorten an npub.
+ */
+export function npubTag(npub: string): string {
+  return npub.length < 4 ? npub : `npub…${npub.slice(-4)}`;
+}
+
+function npubLabel(identity: Identity): string | null {
+  return identity.report.npub === '' ? null : npubTag(identity.report.npub);
+}
+
+/** What an automatically labelled node should be called right now. */
+function autoLabel(node: NodeBase, identity: Identity | null): string | null {
+  if (node.profile !== null) return node.profile.name;
+  return identity === null ? null : npubLabel(identity);
+}
+
+export function setProfileSearch(id: string, search: ProfileSearch | null): void {
+  update(() => {
+    const node = findNode(id);
+    if (node !== undefined) node.search = search;
+  });
+}
+
+/**
+ * Sets or clears a node's profile. The tab follows it while the label is still
+ * automatic, so clearing it puts the npub tag back; a label the user typed is
+ * left alone.
+ */
+export function setNodeProfile(id: string, profile: Profile | null): void {
+  update((draft) => {
+    const node = findNode(id);
+    if (node === undefined) return;
+    node.profile = profile;
+    if (!node.labelAuto) return;
+    const base = autoLabel(node, node.identity);
+    if (base === null) return;
+    node.label = uniqueLabel(base, siblings(node, draft));
+  });
 }
 
 function uniqueLabel(base: string, taken: ReadonlySet<string>): string {
@@ -361,6 +451,8 @@ export function addWalletDraft(keyId: string): string | null {
     identity: null,
     deriving: false,
     error: null,
+    profile: null,
+    search: null,
     cards: [],
     activeCard: null,
   };
@@ -460,6 +552,9 @@ export function addCardDraft(keyId: string, walletId: string | null): string | n
     identity: null,
     deriving: false,
     error: null,
+    labelAuto: true,
+    profile: null,
+    search: null,
   };
   update((draft) => {
     const key = draft.keys.find((entry) => entry.id === keyId);
@@ -498,6 +593,7 @@ export function commitCard(
     card.secret = secret;
     card.status = 'ready';
     card.error = null;
+    card.labelAuto = label === '';
     const taken = new Set(target.cards.filter((entry) => entry.id !== cardId).map((entry) => entry.label));
     card.label = uniqueLabel(label === '' ? card.label : label, taken);
   });
@@ -527,13 +623,10 @@ export function renameNode(id: string, label: string): void {
     if (node === undefined) return;
     if (node.status === 'draft' && 'pem' in node) return; // a key draft has no name yet
     node.label = trimmed;
-    if (isWallet(node)) node.labelAuto = false;
+    node.labelAuto = false;
   });
 }
 
-function isWallet(node: KeyTab | WalletTab | CardTab): node is WalletTab {
-  return 'cards' in node && 'secret' in node;
-}
 
 export function setDeriving(id: string, value: boolean): void {
   update(() => {
@@ -549,16 +642,25 @@ export function setDerived(id: string, identity: Identity): void {
     node.identity = identity;
     node.error = null;
     node.deriving = false;
-    if (!isWallet(node) || !node.labelAuto) return;
-    // The public name of a wallet nobody named: the last four characters of its
-    // npub. The wallet's own npub (no card) is stable, so this lands once.
-    const key = draft.keys.find((entry) => entry.wallets.includes(node));
-    const taken = new Set(
-      (key?.wallets ?? []).filter((entry) => entry.id !== node.id).map((entry) => entry.label),
-    );
-    node.label = uniqueLabel(identity.report.npub.slice(-4), taken);
-    node.labelAuto = false;
+    if (!node.labelAuto) return;
+    // Keep auto-labelling live: the npub tag lands here, and a kind 0 name that
+    // arrives later replaces it through `setNodeProfile`. A name the user typed
+    // set `labelAuto` to false, so it is never touched.
+    const label = autoLabel(node, identity);
+    if (label === null) return;
+    node.label = uniqueLabel(label, siblings(node, draft));
   });
+}
+
+/** The other labels a node has to stay distinct from: its own row. */
+function siblings(node: KeyTab | WalletTab | CardTab, draft: AppState): Set<string> {
+  const rows: readonly NodeBase[][] = draft.keys.flatMap((key) => [key.cards, ...key.wallets.map((wallet) => wallet.cards), key.wallets]);
+  for (const row of rows) {
+    if (row.some((entry) => entry.id === node.id)) {
+      return new Set(row.filter((entry) => entry.id !== node.id).map((entry) => entry.label));
+    }
+  }
+  return new Set();
 }
 
 export function setError(id: string, message: string | null): void {

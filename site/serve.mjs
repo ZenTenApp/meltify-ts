@@ -29,7 +29,8 @@ const CSP = [
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
-  "connect-src 'none'",
+  /* Kind 0 profiles are read from these three relays and nowhere else. */
+  "connect-src wss://purplepag.es wss://user.kindpag.es wss://directory.yabu.me wss://profiles.nostr1.com wss://relay.primal.net wss://relay.snort.social wss://nos.lol",
   "worker-src 'self'",
   "base-uri 'none'",
   "form-action 'none'",

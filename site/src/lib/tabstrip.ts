@@ -16,15 +16,16 @@ export interface StripTab {
   draft?: boolean;
   /** Small marker after the label, e.g. '·' while deriving. */
   mark?: string;
+  /** `data:` URI drawn before the label, e.g. a wallet's hashatar. Decorative. */
+  icon?: string;
   /** Hover text. Must never contain a secret. */
   title?: string;
   /** Static section tab: never closable, never renameable. */
   section?: boolean;
   /**
-   * The immutable "nothing selected here" node: an unlabelled green dot, drawn
-   * first in its row. Green is the palette's public/unmasked colour, and having
-   * no label means it names no secret and cannot be renamed. Like a section tab
-   * it is never closable.
+   * The immutable "nothing selected here" node, drawn first in its row: a green
+   * dot and a fixed-width label that names the identity above the row. It can be
+   * neither renamed nor closed, because it is not a wallet or a card.
    */
   plain?: boolean;
   /** Draws a divider before this tab (fixed sections | dynamic tabs). */
@@ -41,6 +42,12 @@ export interface StripOptions {
   addDisabled?: boolean;
   /** Hides the `+` button (a fixed segmented control, e.g. the leaf panel). */
   addHidden?: boolean;
+  /**
+   * Divides the row's width evenly between every cell — each tab and the
+   * trailing `+` alike (the three shell strips). Off by default, so the leaf
+   * panel's segmented control keeps its natural size.
+   */
+  fill?: boolean;
   /** Dims and disables the whole row (`rows below a key need a key`). */
   disabled?: boolean;
   /** Empty-state text next to a disabled +, e.g. "add a key first". */
@@ -96,9 +103,13 @@ export function createStrip(): Strip {
           title: tab.title ?? tab.label,
           ...(plain ? { 'aria-label': tab.title ?? 'No selection' } : {}),
         },
-        plain
-          ? []
-          : [tab.label, ...(tab.mark === undefined ? [] : [el('span', { class: 'tab__mark' }, [tab.mark])])],
+        [
+          ...(tab.icon === undefined
+            ? []
+            : [el('img', { class: 'tab__icon', src: tab.icon, alt: '', 'aria-hidden': 'true' })]),
+          tab.label,
+          ...(tab.mark === undefined ? [] : [el('span', { class: 'tab__mark' }, [tab.mark])]),
+        ],
       );
       button.dataset.tabId = tab.id;
       if (options.disabled === true) button.disabled = true;
@@ -160,7 +171,12 @@ export function createStrip(): Strip {
     add.disabled = options.addDisabled === true || options.disabled === true;
     add.addEventListener('click', () => options.onAdd());
 
-    root.className = `strip strip--${options.variant}${options.disabled === true ? ' strip--off' : ''}`;
+    root.className = `strip strip--${options.variant}${options.fill === true ? ' strip--fill' : ''}${options.disabled === true ? ' strip--off' : ''}`;
+    // A filled row is an even split over every cell: N tabs plus the trailing `+`.
+    // The list carries `--strip-tabs` so its grow factor is the tab count, which
+    // makes one tab exactly as wide as the `+` beside it.
+    if (options.fill === true) root.style.setProperty('--strip-tabs', String(Math.max(options.tabs.length, 1)));
+    else root.style.removeProperty('--strip-tabs');
     root.replaceChildren(
       list,
       ...(options.addHidden === true ? [] : [add]),

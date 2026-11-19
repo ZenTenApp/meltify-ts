@@ -39,35 +39,41 @@ and `.htaccess`.
 
 ## Layout
 
-Three nested browser-style tab strips, in order:
+Two nested browser-style tab strips under a strip of SSH keys, and the chrome
+docked at the bottom:
 
 | Row | Strip | `+` behaviour | Body below it |
 | --- | --- | --- | --- |
-| 1 | Fixed sections (Self-check, Key tools, Phrase lab) │ SSH key tabs | opens a key draft tab; labelled `+` only when there is nothing yet — the draft tab itself reads **Add SSH Key** and is selected on load | key form: file drop or paste, passphrase, tab name; **Add SSH key** unlocks in the worker |
+| 1 | SSH key tabs | opens a key draft tab; labelled `+` only when there is nothing yet — the draft tab itself reads **Add SSH Key** and is selected on load | key form: file drop or paste, passphrase, tab name; **Add SSH key** unlocks in the worker |
 | 2 | Wallets (subaccounts) | `+ Add wallet` on an empty row, `+` after that | draft tab body: **private name** (the subaccount string, hashed verbatim) and **public name** |
 | 3 | Cards (BIP39 passphrases) | `+ Add card` / `+` | draft tab body: **secret** (the 25th word, masked, optional) and **name** |
 
 Rows 2 and 3 are disabled until a key exists and are hidden while a fixed
-section is showing. Row 3 does not need a wallet: with the empty wallet tab
+section is showing. Row 3 does not need a wallet: with the default wallet tab
 selected, a card hangs off the key itself and derives the source identity with
 that BIP39 passphrase, which is what `meltify-info` does when you pass a 25th
-word to a key. Each of those rows starts with an immutable **empty tab**:
-unlabelled, green, not closable and not renameable. It is the node *above* the
-row — the key with no wallet on row 2, the wallet with no card (or the key with
-no card) on row 3 — and selecting it is how you get back to that identity once
-wallets or cards exist. Everything you type lives in the body under the strip,
-never inside a tab. Double-click a committed tab to rename it — the label only,
-never the secret.
+word to a key. The first tab of each of those rows is immutable: a green dot about a finger
+wide, carrying no text, that names the identity *above* the row in its tooltip
+(`npub…wxyz - no subaccount`, `npub…wxyz - no card`). It cannot be renamed or
+closed and is the way back to that identity once wallets or cards exist. Every
+row splits its width into equal cells — each tab and the trailing `+` alike — so
+wallets, cards, that dot tab and the `+` are all the same width at any count; a
+label too long for its cell truncates with an ellipsis rather than scrolling the row. Everything you type lives in the body under the strip, never inside
+a tab. Double-click a committed tab to rename it — the label only, never the
+secret.
 
-The deepest selected tab is the **leaf**, and the leaf's identity is the panel at
-the bottom: Report / Chains / meltify-info. A key with no wallet shows the source
-identity; a wallet with no card shows the subaccount with the standard (empty)
-BIP39 passphrase. Derivations are lazy — a leaf derives when it is selected and
-is cached on its tab.
+A tab with no name of its own shows `npub…wxyz` — the bech32 prefix, an ellipsis
+and the last four characters. The head cannot be used: every npub starts with
+`npub`. A key whose metadata is pasted in (see below) shows its display name
+instead; key, wallet and card tabs share the rule, and a label you type always
+wins.
 
-No duplicates: keys are deduplicated by PEM text, wallets by the subaccount
-string (byte-for-byte), cards by the passphrase. A refused duplicate leaves the
-draft tab open with the reason.
+`Self-check`, `Key tools` and `Phrase lab` are not tabs. They are buttons in the
+dock, which sits at the bottom of the page and sticks to the bottom of the
+viewport: brand, the three sections, the **hashatar** toggle, **wipe on tab hide**
+and **Wipe now**. Keeping the chrome below the strips is what puts the first tab
+flush with the top of the page, and a sticky dock keeps wipe reachable however
+far you have scrolled.
 
 ## Design notes
 
@@ -86,8 +92,10 @@ draft tab open with the reason.
   never trims it and never normalises it, because `meltify-info` hashes exactly
   these bytes — `work ` and `work` are different wallets, and the form says so
   when it sees whitespace or non-ASCII. The public name is display only, can be
-  changed at any time, and defaults to the last four characters of the derived
-  wallet npub once the derivation lands (a name you typed is never overwritten).
+  changed at any time, and defaults to the last four characters of the node's own
+  npub once it has derived (a name you typed is never overwritten). Key, wallet and
+  card tabs share the rule — the tail rather than the head, because every npub
+  starts with the bech32 prefix `npub`.
 - **A card tab is the BIP39 passphrase, and hiding it is the only difference.**
   Cards feed the PBKDF2 step in `buildIdentityReport({ bip39Passphrase })`, so they
   move the Nostr keys and the 28 BIP39-seeded address rows and leave the seed, the
@@ -118,6 +126,33 @@ draft tab open with the reason.
   and with no label they cannot name one.
 - **Clipboard has a fallback.** `navigator.clipboard` needs a secure context;
   the legacy `execCommand` path keeps copy working over plain http on a LAN.
+- **Every tab carries a hashatar, behind a switch.** Key, wallet and card tabs
+  draw a 14px avatar before their name, keyed on that node's whole npub, so two
+  nodes that differ by one character look different. The **hashatar** toggle in
+  the dock hides them, and while it is off no image is generated at all. `@hashatar/react` is a React component and this
+  shell is plain DOM, so it uses the generator underneath it (`@hashatar/core`),
+  paints the same 32×32 grid to a canvas, and caches the PNG as a `data:` URI —
+  strips re-render on every store change, and the CSP already allows `data:`
+  images. Nothing leaves the page (the generator is `js-sha256` over the string).
+  A key has its npub as soon as it unlocks; a wallet or card has none until it
+  derives, so its avatar appears then.
+- **Kind 0 comes from relays, unverified.** Every wallet and card of a key is
+  derived as soon as the key unlocks — not only the one whose tab is open —
+  because each node has its own npub and therefore its own profile. When a node
+  has an npub and no profile, the shell opens one subscription per relay (the CSP
+  names exactly these: the kind 0 indexers `purplepag.es`, `user.kindpag.es`,
+  `directory.yabu.me`, `profiles.nostr1.com`, then `relay.primal.net`,
+  `relay.snort.social` and `nos.lol`) for `{"kinds":[0],"authors":[…]}`. The name
+  is whatever a relay's event advertises — `display_name`, else `name`, newest
+  `created_at` winning — so **nothing is verified against the npub**: any relay
+  can put a name on a tab, and the tab marks that name with `?` while the panel
+  says `unverified · <relay>`. A name you paste yourself is marked `paste` and
+  outranks the relay's. One round, no retries, no wall-clock deadline: a round
+  ends when every relay has finished (EOSE, CLOSED, an error, or sending nothing
+  at all for 20 s). Nothing about the report depends on any of it, and no
+  `picture` is loaded. Verification (NIP-01 id + BIP340 signature) is absent on
+  purpose; NIP-01 serialises `[0, pubkey, created_at, kind, tags, content]` —
+  six elements, with `kind` as its own element — should it ever come back.
 - **No routing at all.** Tab selection is in-memory state, not the URL, so the
   build drops into `public_html/` or a subdirectory unchanged and a reload always
   starts from an empty **Add SSH Key** tab.
@@ -173,8 +208,9 @@ Prerequisites, all outside the repo:
 
 Then check:
 
-1. `https://nostr.box/meltify/` loads, and the badge says "offline by policy".
-2. DevTools → Network shows exactly two requests after load (no third parties).
+1. `https://nostr.box/meltify/` loads, and the badge says "keys stay local".
+2. DevTools → Network shows two requests for the page itself after load. Opening a
+   key adds one websocket per relay for its kind 0 profile, and nothing else.
 3. Response headers include the `Content-Security-Policy` from `.htaccess`.
    cPanel needs `mod_headers` enabled (it is on standard cPanel/Apache builds).
 4. Adding a wallet and a card under a key works — those need

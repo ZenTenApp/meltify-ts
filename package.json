@@ -23,6 +23,7 @@
     "site:typecheck": "tsc -p site/tsconfig.json"
   },
   "dependencies": {
+    "@hashatar/core": "^1.6.0",
     "@noble/ciphers": "^2.4.0",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",

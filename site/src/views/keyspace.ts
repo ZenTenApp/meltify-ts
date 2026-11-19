@@ -20,6 +20,8 @@ import {
 } from '../lib/store.ts';
 import { mountKeyForm } from './keyform.ts';
 import { mountNodeForm } from './nodeform.ts';
+import { profilePanel } from './profile.ts';
+import type { Ctx } from '../app-types.ts';
 export interface KeySpace {
   root: HTMLElement;
   /** Where the shared leaf panel belongs for this key. */
@@ -29,7 +31,7 @@ export interface KeySpace {
   render(key: KeyTab): void;
 }
 
-export function mountKeySpace(key: KeyTab): KeySpace {
+export function mountKeySpace(key: KeyTab, ctx: Ctx): KeySpace {
   const keySlot = el('div');
   const walletPanel = el('div');
   const cardPanel = el('div');
@@ -77,7 +79,8 @@ export function mountKeySpace(key: KeyTab): KeySpace {
     const form = mountNodeForm({
       kind: 'card',
       parent: wallet === null ? `the “${key.label}” key` : `wallet “${wallet.label}”`,
-      initialLabel: card.label,
+      // As with wallets: a placeholder is not a name, so leave the field empty.
+      initialLabel: card.labelAuto ? '' : card.label,
       initialSecret: card.secret,
       onSubmit: (secret, label) => {
         const error = commitCard(key.id, walletId, card.id, secret, label);
@@ -126,8 +129,9 @@ export function mountKeySpace(key: KeyTab): KeySpace {
           ]),
         ]),
         hint(
-          'Wallets derived from this key appear on the row below. The green tab at the left is the empty wallet — the key’s own identity, with no subaccount.',
+          'Wallets derived from this key appear on the row below. The first tab there is the key’s own identity, with no subaccount.',
         ),
+        profilePanel(current, ctx),
       ]),
     );
   };
@@ -174,6 +178,7 @@ export function mountKeySpace(key: KeyTab): KeySpace {
           }),
         ]),
         hint('Cards below hold the BIP39 passphrase for this wallet. Add one per wallet you use.'),
+        profilePanel(wallet, ctx),
       ]),
     );
   };
@@ -227,6 +232,7 @@ export function mountKeySpace(key: KeyTab): KeySpace {
                 note: 'the 25th word; PBKDF2 input, NFKD as per BIP39',
               }),
         ]),
+        profilePanel(card, ctx),
       ]),
     );
   };

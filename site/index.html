@@ -18,7 +18,27 @@
   <body>
     <a class="skip" href="#views">Skip to content</a>
 
-    <header class="top">
+    <!-- Tab strips are rendered here: SSH keys, wallets, cards. -->
+    <div id="strips" class="strips"></div>
+
+    <main id="views"></main>
+
+    <footer class="foot">
+      <p>
+        <strong>Treat the output as secret.</strong> The report contains the raw Ed25519 seed. Key material
+        never leaves this page and is never stored — it lives in memory only. The one thing fetched is a
+        kind 0 profile, by npub, from three relays named in the CSP, and only a signature that verifies
+        against the key on screen is used.
+      </p>
+      <p class="dim">
+        meltify-ts · TypeScript port of <code>meltify-info</code> · masking and export are presentation
+        concerns, not encryption.
+      </p>
+    </footer>
+
+    <!-- Chrome lives at the bottom so the first tab strip is flush with the top
+         of the page: brand, the three utility sections, and the controls. -->
+    <div class="dock">
       <div class="brand">
         <span class="mark" aria-hidden="true">◈</span>
         <div class="brand-text">
@@ -26,32 +46,24 @@
           <p class="tag">Ed25519 identity console · everything runs in this tab</p>
         </div>
       </div>
-      <div class="topmeta">
-        <span class="badge" title="The page ships a connect-src 'none' policy">offline by policy</span>
+      <nav class="dock__sections" aria-label="Sections">
+        <button type="button" class="dock__link" id="sec-selfcheck">Self-check</button>
+        <button type="button" class="dock__link" id="sec-keytools">Key tools</button>
+        <button type="button" class="dock__link" id="sec-phrases">Phrase lab</button>
+      </nav>
+      <div class="dock__meta">
+        <span class="badge" title="Key material never leaves this page; kind 0 profiles are read from three relays">keys stay local</span>
+        <label class="switch" title="Draw the hashatar avatar before each tab name">
+          <input type="checkbox" id="hashatar" checked />
+          <span>hashatar</span>
+        </label>
         <label class="switch" title="Wipe the derived identity when this tab loses focus">
           <input type="checkbox" id="autoclear" checked />
           <span>wipe on tab hide</span>
         </label>
         <button type="button" class="btn ghost" id="wipe">Wipe now</button>
       </div>
-    </header>
-
-    <!-- Three tab strips are rendered here: SSH keys, wallets, cards. -->
-    <div id="strips" class="strips"></div>
-
-    <main id="views"></main>
-
-    <footer class="foot">
-      <p>
-        <strong>Treat the output as secret.</strong> The report contains the raw Ed25519 seed. Nothing is
-        uploaded, logged, or stored — the CSP on this page forbids network requests, and the app keeps
-        key material in memory only.
-      </p>
-      <p class="dim">
-        meltify-ts · TypeScript port of <code>meltify-info</code> · masking and export are presentation
-        concerns, not encryption.
-      </p>
-    </footer>
+    </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
