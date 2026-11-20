@@ -1,10 +1,10 @@
 /**
- * One browser-style tab strip: a `tablist` plus a trailing `+` button.
+ * One browser-style tab strip: a `tablist` plus a trailing add button.
  *
  * Used three times (keys, wallets, cards) at three sizes. The strip owns no
- * state beyond an in-place rename; the caller re-renders it from the store.
- * Double-click a committed tab to rename it — that edits the label only, never
- * the secret, because changing a secret changes the identity.
+ * state at all; the caller re-renders it from the store. Titles are positional
+ * numbers (`Key 1`, `Wallet 1.2`, `Card 1.2.3`), or a key's own OpenSSH comment,
+ * so there is nothing to rename in place.
  */
 
 import { el } from './dom.ts';
@@ -20,12 +20,12 @@ export interface StripTab {
   icon?: string;
   /** Hover text. Must never contain a secret. */
   title?: string;
-  /** Static section tab: never closable, never renameable. */
+  /** Static section tab: never closable. */
   section?: boolean;
   /**
    * The immutable "nothing selected here" node, drawn first in its row: a green
    * dot and a fixed-width label that names the identity above the row. It can be
-   * neither renamed nor closed, because it is not a wallet or a card.
+   * neither labelled nor closed, because it is not a wallet or a card.
    */
   plain?: boolean;
   /** Draws a divider before this tab (fixed sections | dynamic tabs). */
@@ -40,14 +40,8 @@ export interface StripOptions {
   addLabel: string;
   addTitle: string;
   addDisabled?: boolean;
-  /** Hides the `+` button (a fixed segmented control, e.g. the leaf panel). */
+  /** Hides the add button (a fixed segmented control, e.g. the leaf panel). */
   addHidden?: boolean;
-  /**
-   * Divides the row's width evenly between every cell — each tab and the
-   * trailing `+` alike (the three shell strips). Off by default, so the leaf
-   * panel's segmented control keeps its natural size.
-   */
-  fill?: boolean;
   /** Dims and disables the whole row (`rows below a key need a key`). */
   disabled?: boolean;
   /** Empty-state text next to a disabled +, e.g. "add a key first". */
@@ -56,7 +50,6 @@ export interface StripOptions {
   onSelect(id: string): void;
   onAdd(): void;
   onClose?(id: string): void;
-  onRename?(id: string, label: string): void;
 }
 
 interface Strip {
@@ -71,18 +64,8 @@ function itemClass(active: boolean): string {
 
 export function createStrip(): Strip {
   const root = el('div', { class: 'strip' });
-  let current: StripOptions | null = null;
-  /** Set while an inline rename input is open, so re-renders do not eat it. */
-  let editing: { id: string; input: HTMLInputElement } | null = null;
 
   const render = (options: StripOptions): void => {
-    if (editing !== null) {
-      // Keep the input alive; the options in hand are stale once the rename commits.
-      current = options;
-      return;
-    }
-    current = options;
-
     const list = el('div', { class: 'strip__list', role: 'tablist', 'aria-label': options.label });
     const buttons: HTMLButtonElement[] = [];
 
@@ -114,13 +97,8 @@ export function createStrip(): Strip {
       button.dataset.tabId = tab.id;
       if (options.disabled === true) button.disabled = true;
       button.addEventListener('click', () => options.onSelect(tab.id));
-      button.addEventListener('dblclick', () => {
-        if (tab.section === true || plain || options.onRename === undefined || options.disabled === true) {
-          return;
-        }
-        beginRename(tab, button);
-      });
 
+      const itemBase = itemClass(isActive) + (plain ? ' tabitem--plain' : '');
       if (tab.section !== true && !plain && options.onClose !== undefined) {
         const close = el('button', {
           type: 'button',
@@ -134,10 +112,10 @@ export function createStrip(): Strip {
           options.onClose?.(tab.id);
         });
         list.append(
-          el('span', { class: itemClass(isActive), role: 'presentation' }, [button, close]),
+          el('span', { class: itemBase, role: 'presentation' }, [button, close]),
         );
       } else {
-        list.append(el('span', { class: itemClass(isActive), role: 'presentation' }, [button]));
+        list.append(el('span', { class: itemBase, role: 'presentation' }, [button]));
       }
       buttons.push(button);
     }
@@ -160,63 +138,25 @@ export function createStrip(): Strip {
       if (tab !== undefined) options.onSelect(tab.id);
     });
 
-    // The plain tab is always there, so label the `+` while the row has nothing else.
-    const named = options.tabs.filter((tab) => tab.plain !== true).length;
     const add = el('button', {
       type: 'button',
-      class: `tabadd${named === 0 ? ' tabadd--labelled' : ''}`,
+      class: 'tabadd',
       title: options.addTitle,
       'aria-label': options.addTitle,
     }, [options.addLabel]);
     add.disabled = options.addDisabled === true || options.disabled === true;
     add.addEventListener('click', () => options.onAdd());
 
-    root.className = `strip strip--${options.variant}${options.fill === true ? ' strip--fill' : ''}${options.disabled === true ? ' strip--off' : ''}`;
-    // A filled row is an even split over every cell: N tabs plus the trailing `+`.
-    // The list carries `--strip-tabs` so its grow factor is the tab count, which
-    // makes one tab exactly as wide as the `+` beside it.
-    if (options.fill === true) root.style.setProperty('--strip-tabs', String(Math.max(options.tabs.length, 1)));
-    else root.style.removeProperty('--strip-tabs');
+    root.className = `strip strip--${options.variant}${options.disabled === true ? ' strip--off' : ''}`;
+    // The tabs grow into the row, so the add button is pinned to the right with
+    // the leftover space between them; the note sits just before the button.
     root.replaceChildren(
       list,
-      ...(options.addHidden === true ? [] : [add]),
       ...(options.disabled === true && options.disabledNote !== undefined
         ? [el('span', { class: 'strip__note' }, [options.disabledNote])]
         : []),
+      ...(options.addHidden === true ? [] : [add]),
     );
-  };
-
-  const beginRename = (tab: StripTab, button: HTMLButtonElement): void => {
-    const input = el('input', {
-      type: 'text',
-      class: 'tab__rename',
-      value: tab.label,
-      'aria-label': `Rename ${tab.label}`,
-    });
-    editing = { id: tab.id, input };
-    button.replaceWith(input);
-    input.focus();
-    input.select();
-
-    const finish = (commit: boolean): void => {
-      if (editing === null || editing.id !== tab.id) return;
-      const value = input.value.trim();
-      editing = null;
-      if (commit && value !== '' && value !== tab.label) current?.onRename?.(tab.id, value);
-      // `current` may have advanced while the input was open; redraw from it.
-      if (current !== null) render(current);
-    };
-
-    input.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        finish(true);
-      } else if (event.key === 'Escape') {
-        event.preventDefault();
-        finish(false);
-      }
-    });
-    input.addEventListener('blur', () => finish(true));
   };
 
   return { root, render };

@@ -163,9 +163,9 @@ body {
 }
 
 /* ---------- tab strips ----------
-   Three nested strips, flat like the old section nav: no backgrounds, no
-   rounded corners, a 1px top border per row, and a 2px accent underline on the
-   selected tab. Level is shown by indent and type size, nothing else. */
+   Three nested strips drawn as real tabs: every tab is a rounded box, and the
+   selected one is lifted out of the row in the panel colour with an accent
+   edge on top. Level is shown by indent and type size, nothing else. */
 
 .strips {
   max-width: 1080px;
@@ -181,9 +181,8 @@ body {
 
 .strip {
   display: flex;
-  align-items: stretch;
+  align-items: flex-end;
   gap: 6px;
-  border-top: 1px solid var(--border-soft);
   border-bottom: 1px solid var(--border-soft);
   min-height: 44px;
 }
@@ -192,11 +191,13 @@ body {
 }
 .strip__list {
   display: flex;
-  gap: 4px;
-  align-items: stretch;
+  flex: 1 1 auto;
+  gap: 3px;
+  align-items: flex-end;
   overflow-x: auto;
   scrollbar-width: none;
   min-width: 0;
+  padding-top: 4px;
 }
 .strip__list::-webkit-scrollbar {
   display: none;
@@ -227,11 +228,21 @@ body {
 .tabitem {
   display: inline-flex;
   align-items: stretch;
-  border-bottom: 2px solid transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  transition: background 0.12s, border-color 0.12s;
 }
-/* On the wrapper, not the button: the underline runs under the × as well. */
+.tabitem:hover {
+  background: var(--bg-2);
+  border-color: var(--border);
+}
+/* The selected tab is a panel-coloured box with an accent edge on top, so it
+   reads as a tab pulled forward out of the row. */
 .tabitem--active {
-  border-bottom-color: var(--accent);
+  background: var(--panel);
+  border-color: var(--border);
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 
 .tab {
@@ -242,7 +253,7 @@ body {
   background: none;
   border: none;
   border-radius: 0;
-  padding: 14px 14px 12px;
+  padding: 10px 13px 9px;
   cursor: pointer;
   white-space: nowrap;
   max-width: 17rem;
@@ -265,17 +276,12 @@ body {
    the only thing it carries is the palette's public/unmasked colour: it names
    no secret and can be neither renamed nor closed. */
 .tab--plain {
-  flex: 0 0 auto;
   /* A finger-width target, no wider: the tab carries a dot, and the label it
-     would have carried lives in the tooltip. */
-  min-width: 3.25rem;
+     would have carried lives in the tooltip. The wrapper sets its width. */
   max-width: none;
   padding-left: 0;
   padding-right: 0;
   text-align: center;
-}
-.strip--minor .tab--plain {
-  min-width: 3rem;
 }
 .tab--plain::before {
   content: '';
@@ -318,12 +324,12 @@ body {
 
 .strip--sub .tab {
   font-size: 12.5px;
-  padding: 11px 12px 9px;
+  padding: 8px 11px 7px;
   max-width: 14rem;
 }
 .strip--minor .tab {
   font-size: 11.5px;
-  padding: 9px 10px 7px;
+  padding: 6px 9px 6px;
   max-width: 13rem;
 }
 
@@ -334,7 +340,7 @@ body {
   cursor: pointer;
   font-size: 13px;
   line-height: 1;
-  padding: 11px 9px;
+  padding: 9px 9px;
   margin: auto 0 auto -6px;
   min-width: 26px;
   border-radius: 3px;
@@ -350,21 +356,24 @@ body {
   color: var(--text);
 }
 
+/* The add button is always labelled ("+ Add wallet"), never a bare `+`, so the
+   row says what it adds even when it is full. */
 .tabadd {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
   background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  padding: 14px 12px 12px;
+  border: 1px dashed var(--border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 12px 9px;
   cursor: pointer;
   white-space: nowrap;
 }
 .tabadd:hover:not(:disabled) {
   color: var(--accent);
+  border-color: var(--accent);
 }
 .tabadd:disabled {
   opacity: 0.4;
@@ -372,11 +381,11 @@ body {
 }
 .strip--sub .tabadd {
   font-size: 12.5px;
-  padding: 11px 10px 9px;
+  padding: 8px 10px 7px;
 }
 .strip--minor .tabadd {
   font-size: 11.5px;
-  padding: 9px 9px 7px;
+  padding: 6px 9px 6px;
 }
 
 .tabsep {
@@ -386,52 +395,35 @@ body {
   margin: 7px 7px;
 }
 
-.tab__rename {
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 14px 8px 12px;
-  border: none;
-  border-bottom: 2px solid var(--accent);
-  border-radius: 0;
-  background: var(--bg-2);
-  color: var(--text);
-  width: 10rem;
+/* Every tab is a fixed-width cell, Chrome-style: a long title truncates instead
+   of stretching the tab, and the strip scrolls sideways once the tabs no longer
+   fit. The list takes the row's spare space, so the add button stays pinned to
+   the right edge with the empty space between it and the last tab. The plain dot
+   tab at the head of the wallet and card rows keeps its finger-width cell. */
+.strip--major .tabitem {
+  flex: 0 0 176px;
 }
-
-/* A shell strip divides its width evenly between every cell: each tab and the
-   trailing `+` get the same share. The list grows N times as fast as the single
-   `+` (`--strip-tabs`, set by the strip) over a zero gap, so one tab and the `+`
-   come out the same width; the remaining 6px gap between the two is the only
-   separation in the row. No `max-width` and `min-width: 0` let a tab shrink to
-   its share instead of scrolling, truncating a long label. The plain dot tab at
-   the head of the wallet and card rows is a full peer, not a fixed
-   finger-width column. The leaf panel's segmented control does not opt in. */
-.strip--fill > .strip__list {
-  flex: var(--strip-tabs, 1) 1 0;
-  gap: 0;
+.strip--sub .tabitem {
+  flex: 0 0 152px;
 }
-.strip--fill .tabitem {
-  flex: 1 1 0;
-  min-width: 0;
+.strip--minor .tabitem {
+  flex: 0 0 136px;
 }
-.strip--fill .tab {
+.tabitem--plain {
+  flex: 0 0 3.25rem;
+}
+.strip--minor .tabitem--plain,
+.strip--sub .tabitem--plain {
+  flex: 0 0 3rem;
+}
+.tabitem .tab {
   flex: 1 1 auto;
   min-width: 0;
   max-width: none;
-  text-align: center;
 }
-.strip--fill .tab--plain {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: none;
-}
-.strip--fill > .tabadd {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.strip > .tabadd {
+  flex: 0 0 auto;
+  margin-left: 8px;
 }
 
 /* ---------- layout ---------- */
@@ -498,6 +490,17 @@ main {
 }
 .hint.tight {
   margin: 6px 0 0;
+}
+
+/* The key form's validation line is always in the flow, so accepting a key
+   toggles the passphrase in place without moving the form. */
+.keynotice {
+  min-height: 20px;
+  margin: 10px 0 8px;
+}
+input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .mono {

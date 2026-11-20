@@ -55,9 +55,9 @@ function found(name: string, createdAt: number) {
 function tree(): { keyId: string; walletId: string } {
   resetAll();
   const keyId = getState().keys[0].id;
-  commitKey(keyId, { pem: 'PEM', passphrase: '', source: 'test', label: '', identity: identity(KEY_PUB) });
+  commitKey(keyId, { pem: 'PEM', passphrase: '', source: 'test', comment: '', identity: identity(KEY_PUB) });
   const walletId = addWalletDraft(keyId) as string;
-  commitWallet(keyId, walletId, 'subaccount', '');
+  commitWallet(keyId, walletId, 'subaccount');
   setDerived(walletId, identity(WALLET_PUB));
   return { keyId, walletId };
 }
@@ -65,7 +65,7 @@ function tree(): { keyId: string; walletId: string } {
 /** A card on the wallet with an empty passphrase: the wallet's own identity. */
 function defaultCard(keyId: string, walletId: string): string {
   const cardId = addCardDraft(keyId, walletId) as string;
-  commitCard(keyId, walletId, cardId, '', '');
+  commitCard(keyId, walletId, cardId, '');
   setDerived(cardId, identity(WALLET_PUB));
   return cardId;
 }
@@ -144,7 +144,7 @@ describe('kind 0 profiles', () => {
 
     // A node with nothing takes the name, with no round of its own.
     const ledger = addWalletDraft(keyId) as string;
-    commitWallet(keyId, ledger, 'second', '');
+    commitWallet(keyId, ledger, 'second');
     setDerived(ledger, identity('cc'.repeat(32)));
     recordProfile(getState(), book, 'cc'.repeat(32), found('ledger', 100), [], 3);
     expect(nameOf(ledger)).toBe('ledger');

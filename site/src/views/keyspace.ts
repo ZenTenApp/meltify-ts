@@ -1,18 +1,21 @@
 /**
- * One key tab's body: the key, then its wallet strip, then its card strip, with
- * a panel under each strip and the leaf panel at the bottom.
+ * One key tab's body: whatever the deepest selected tab derives, and the leaf
+ * panel under it. Only the selected section has content — selecting a key shows
+ * no panel of its own, selecting the empty wallet or card tab shows nothing,
+ * and a wallet's panel disappears while one of its cards is selected.
  *
  * The DOM is built once per key tab and updated in place. Draft forms are cached
  * by node id, so switching tabs or rows never loses typing.
  */
 
 import { valueBlock } from '../lib/blocks.ts';
-import { el, hint, pill, toast } from '../lib/dom.ts';
+import { el, hint, toast } from '../lib/dom.ts';
 import {
   commitCard,
   commitWallet,
+  getState,
+  labelOf,
   removeCard,
-  removeKey,
   removeWallet,
   type CardTab,
   type KeyTab,
@@ -32,9 +35,7 @@ export interface KeySpace {
 }
 
 export function mountKeySpace(key: KeyTab, ctx: Ctx): KeySpace {
-  const keySlot = el('div');
-  const walletPanel = el('div');
-  const cardPanel = el('div');
+  const panel = el('div');
   const leafSlot = el('div');
 
   /** Draft forms, one per node id, kept alive across re-renders. */
@@ -50,16 +51,13 @@ export function mountKeySpace(key: KeyTab, ctx: Ctx): KeySpace {
     if (cached !== undefined) return cached;
     const form = mountNodeForm({
       kind: 'wallet',
-      parent: `the “${key.label}” key`,
-      // A placeholder label is not a name: leave the field empty so the hint
-      // about the npub suffix applies, and the first derivation can fill it in.
-      initialLabel: wallet.labelAuto ? '' : wallet.label,
+      parent: `the “${labelOf(getState(), key.id)}” key`,
       initialSecret: wallet.secret,
-      onSubmit: (secret, label) => {
-        const error = commitWallet(key.id, wallet.id, secret, label);
+      onSubmit: (secret) => {
+        const error = commitWallet(key.id, wallet.id, secret);
         if (error === null) {
           forgetForm(wallet.id);
-          toast(`Wallet “${label === '' ? wallet.label : label}” added`);
+          toast(`${labelOf(getState(), wallet.id)} added`);
         }
         return error;
       },
@@ -78,15 +76,13 @@ export function mountKeySpace(key: KeyTab, ctx: Ctx): KeySpace {
     const walletId = wallet?.id ?? null;
     const form = mountNodeForm({
       kind: 'card',
-      parent: wallet === null ? `the “${key.label}” key` : `wallet “${wallet.label}”`,
-      // As with wallets: a placeholder is not a name, so leave the field empty.
-      initialLabel: card.labelAuto ? '' : card.label,
+      parent: wallet === null ? `the “${labelOf(getState(), key.id)}” key` : labelOf(getState(), wallet.id),
       initialSecret: card.secret,
-      onSubmit: (secret, label) => {
-        const error = commitCard(key.id, walletId, card.id, secret, label);
+      onSubmit: (secret) => {
+        const error = commitCard(key.id, walletId, card.id, secret);
         if (error === null) {
           forgetForm(card.id);
-          toast(`Card “${label === '' ? card.label : label}” added`);
+          toast(`${labelOf(getState(), card.id)} added`);
         }
         return error;
       },
@@ -99,155 +95,65 @@ export function mountKeySpace(key: KeyTab, ctx: Ctx): KeySpace {
     return form;
   };
 
-  const renderKey = (current: KeyTab): void => {
+  const renderWallet = (wallet: WalletTab): HTMLElement => {
+    if (wallet.status === 'draft') return walletForm(wallet);
+    return el('section', { class: 'card tight' }, [
+      el('h2', { class: 'inline-title' }, [labelOf(getState(), wallet.id)]),
+      el('div', { class: 'blocks', style: 'margin-top: 12px' }, [
+        valueBlock('private name', wallet.secret, {
+          masked: true,
+          note: 'hashed verbatim: SHA256(SHA256(utf8(private name)) ‖ key seed)',
+        }),
+      ]),
+      hint('Cards below hold the BIP39 passphrase for this wallet. Add one per wallet you use.'),
+      profilePanel(wallet, ctx),
+    ]);
+  };
+
+  const renderCard = (wallet: WalletTab | null, card: CardTab): HTMLElement => {
+    if (card.status === 'draft') return cardForm(wallet, card);
+    return el('section', { class: 'card tight' }, [
+      el('h2', { class: 'inline-title' }, [labelOf(getState(), card.id)]),
+      el('div', { class: 'blocks', style: 'margin-top: 12px' }, [
+        card.secret === ''
+          ? el('p', { class: 'hint' }, ['No passphrase: the standard BIP39 derivation.'])
+          : valueBlock('bip39 passphrase', card.secret, {
+              masked: true,
+              note: 'the 25th word; PBKDF2 input, NFKD as per BIP39',
+            }),
+      ]),
+      profilePanel(card, ctx),
+    ]);
+  };
+
+  /** The one panel the selected tab earns; `null` when it shows no content. */
+  const selectedPanel = (current: KeyTab): HTMLElement | null => {
     if (current.status === 'draft') {
       keyForm ??= mountKeyForm(current, () => {
         forms.clear();
         keyForm = null;
       });
-      keySlot.replaceChildren(keyForm);
-      return;
+      return keyForm;
     }
-    const identity = current.identity;
-    keySlot.replaceChildren(
-      el('section', { class: 'card tight keycard' }, [
-        el('div', { class: 'row', style: 'justify-content: space-between' }, [
-          el('div', { class: 'row tight' }, [
-            el('h2', { class: 'inline-title' }, ['Key']),
-            pill(current.source === '' ? 'pasted key' : current.source),
-            ...(identity === null ? [] : [pill(identity.report.fingerprint)]),
-          ]),
-          el('div', { class: 'row tight' }, [
-            el('button', {
-              type: 'button',
-              class: 'btn ghost small',
-              onclick: () => {
-                removeKey(current.id);
-                toast('Key tab closed');
-              },
-            }, ['Close key tab']),
-          ]),
-        ]),
-        hint(
-          'Wallets derived from this key appear on the row below. The first tab there is the key’s own identity, with no subaccount.',
-        ),
-        profilePanel(current, ctx),
-      ]),
-    );
-  };
-
-  const renderWalletPanel = (current: KeyTab, wallet: WalletTab | null): void => {
-    if (current.status !== 'ready') {
-      walletPanel.replaceChildren();
-      return;
-    }
+    const wallet = current.wallets.find((entry) => entry.id === current.activeWallet) ?? null;
     if (wallet === null) {
-      walletPanel.replaceChildren(
-        el('section', { class: 'card tight' }, [
-          hint(
-            'Empty wallet selected. “+ Add wallet” names a subaccount: a different, deterministic key derived from this one, with its own cards and its own identity below. The first tab in the wallet row — this one — is the key itself.',
-          ),
-        ]),
-      );
-      return;
+      const card = current.cards.find((entry) => entry.id === current.activeCard) ?? null;
+      return card === null ? null : renderCard(null, card);
     }
-    if (wallet.status === 'draft') {
-      walletPanel.replaceChildren(walletForm(wallet));
-      return;
-    }
-    walletPanel.replaceChildren(
-      el('section', { class: 'card tight' }, [
-        el('div', { class: 'row', style: 'justify-content: space-between' }, [
-          el('h2', { class: 'inline-title' }, [`Wallet “${wallet.label}”`]),
-          el('div', { class: 'row tight' }, [
-            el('button', {
-              type: 'button',
-              class: 'btn ghost small',
-              onclick: () => {
-                forgetForm(wallet.id);
-                removeWallet(current.id, wallet.id);
-                toast('Wallet tab closed');
-              },
-            }, ['Close wallet tab']),
-          ]),
-        ]),
-        el('div', { class: 'blocks', style: 'margin-top: 12px' }, [
-          valueBlock('private name', wallet.secret, {
-            masked: true,
-            note: 'hashed verbatim: SHA256(SHA256(utf8(private name)) ‖ key seed) — the public name is display only',
-          }),
-        ]),
-        hint('Cards below hold the BIP39 passphrase for this wallet. Add one per wallet you use.'),
-        profilePanel(wallet, ctx),
-      ]),
-    );
+    if (wallet.status === 'draft') return renderWallet(wallet);
+    const card = wallet.cards.find((entry) => entry.id === wallet.activeCard) ?? null;
+    return card === null ? renderWallet(wallet) : renderCard(wallet, card);
   };
 
-  const renderCardPanel = (current: KeyTab, wallet: WalletTab | null): void => {
-    // A draft wallet has nothing to attach a card to yet; no wallet is fine — the
-    // card then belongs to the key itself.
-    if (wallet !== null && wallet.status !== 'ready') {
-      cardPanel.replaceChildren();
-      return;
-    }
-    const host = wallet ?? current;
-    const card = host.cards.find((entry) => entry.id === host.activeCard) ?? null;
-    if (card === null) {
-      cardPanel.replaceChildren(
-        el('section', { class: 'card tight' }, [
-          hint(
-            wallet === null
-              ? 'Empty card selected. The panel below shows this key on its own with the standard (empty) BIP39 passphrase. Add a card to derive it with a 25th word instead: no subaccount is involved.'
-              : 'Empty card selected. The panel below shows this wallet with the standard (empty) BIP39 passphrase — exactly what every wallet matches. Add a card only for a wallet that uses a 25th word; the green tab in the card row comes back here.',
-          ),
-        ]),
-      );
-      return;
-    }
-    if (card.status === 'draft') {
-      cardPanel.replaceChildren(cardForm(wallet, card));
-      return;
-    }
-    cardPanel.replaceChildren(
-      el('section', { class: 'card tight' }, [
-        el('div', { class: 'row', style: 'justify-content: space-between' }, [
-          el('h2', { class: 'inline-title' }, [`Card “${card.label}”`]),
-          el('div', { class: 'row tight' }, [
-            el('button', {
-              type: 'button',
-              class: 'btn ghost small',
-              onclick: () => {
-                forgetForm(card.id);
-                removeCard(current.id, wallet?.id ?? null, card.id);
-                toast('Card tab closed');
-              },
-            }, ['Close card tab']),
-          ]),
-        ]),
-        el('div', { class: 'blocks', style: 'margin-top: 12px' }, [
-          card.secret === ''
-            ? el('p', { class: 'hint' }, ['No passphrase: the standard BIP39 derivation.'])
-            : valueBlock('bip39 passphrase', card.secret, {
-                masked: true,
-                note: 'the 25th word; PBKDF2 input, NFKD as per BIP39',
-              }),
-        ]),
-        profilePanel(card, ctx),
-      ]),
-    );
-  };
-
-  const root = el('div', { class: 'view keyspace' }, [keySlot, walletPanel, cardPanel, leafSlot]);
+  const root = el('div', { class: 'view keyspace' }, [panel, leafSlot]);
 
   return {
     root,
     leafSlot,
     forget: forgetForm,
     render(current) {
-      renderKey(current);
-      const wallet = current.wallets.find((entry) => entry.id === current.activeWallet) ?? null;
-      renderWalletPanel(current, wallet);
-      renderCardPanel(current, wallet);
+      const content = selectedPanel(current);
+      panel.replaceChildren(...(content === null ? [] : [content]));
     },
   };
 }

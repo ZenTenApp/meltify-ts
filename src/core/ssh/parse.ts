@@ -174,6 +174,37 @@ export function isUnprotectedKey(input: string | Uint8Array): boolean {
   return readContainer(der).cipher === CIPHER_NONE;
 }
 
+/** What a key reveals before its passphrase is known. */
+export interface OpenSSHKeyInspection {
+  /** Container cipher, e.g. `aes256-ctr` or `none`. */
+  cipher: string;
+  /** Container KDF, e.g. `bcrypt`. */
+  kdf: string;
+  /** Key type from the embedded public key blob, e.g. `ssh-ed25519`. */
+  keyType: string;
+  /** True when the private section is encrypted. */
+  protected: boolean;
+}
+
+/**
+ * Reads the container header and embedded public key blob without a passphrase.
+ *
+ * This is the shape a UI needs to accept a key before asking for its
+ * passphrase: nothing here decrypts anything, so a wrong passphrase is still
+ * only discoverable by deriving. Throws `KeyParseError` for malformed input.
+ */
+export function inspectOpenSSHKey(input: string | Uint8Array): OpenSSHKeyInspection {
+  const { der } = decodeOpenSSHPem(input);
+  const container = readContainer(der);
+  const keyType = bytesToUtf8(new SshReader(container.publicKeyBlob).string());
+  return {
+    cipher: container.cipher,
+    kdf: container.kdf,
+    keyType,
+    protected: container.cipher !== CIPHER_NONE,
+  };
+}
+
 /**
  * Parses a password-protected Ed25519 OpenSSH private key.
  *

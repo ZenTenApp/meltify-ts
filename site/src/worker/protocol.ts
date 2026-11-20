@@ -35,6 +35,11 @@ export type WorkerResult =
       subaccount: string;
       /** Echoed back; the BIP39 passphrase the report was derived with. */
       bip39Passphrase: string;
+      /**
+       * Comment stored inside the source OpenSSH key; '' when it has none, and
+       * '' for a subaccount, whose re-encoded PEM carries no comment.
+       */
+      comment: string;
       /** Re-encoded subaccount PEM; absent when no subaccount was requested. */
       pem?: string;
       elapsedMs: number;

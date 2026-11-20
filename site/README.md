@@ -42,31 +42,40 @@ and `.htaccess`.
 Two nested browser-style tab strips under a strip of SSH keys, and the chrome
 docked at the bottom:
 
-| Row | Strip | `+` behaviour | Body below it |
+| Row | Strip | Add button | Body below it |
 | --- | --- | --- | --- |
-| 1 | SSH key tabs | opens a key draft tab; labelled `+` only when there is nothing yet — the draft tab itself reads **Add SSH Key** and is selected on load | key form: file drop or paste, passphrase, tab name; **Add SSH key** unlocks in the worker |
-| 2 | Wallets (subaccounts) | `+ Add wallet` on an empty row, `+` after that | draft tab body: **private name** (the subaccount string, hashed verbatim) and **public name** |
-| 3 | Cards (BIP39 passphrases) | `+ Add card` / `+` | draft tab body: **secret** (the 25th word, masked, optional) and **name** |
+| 1 | SSH key tabs | **+ Add key**, always labelled | draft tab body: file drop or paste, then a passphrase that stays disabled until the armored key validates as a protected Ed25519 key; **Add key** unlocks in the worker |
+| 2 | Wallets (subaccounts) | **+ Add wallet**, always labelled | draft tab body: **private name** (the subaccount string, hashed verbatim) |
+| 3 | Cards (BIP39 passphrases) | **+ Add card**, always labelled | draft tab body: **secret** (the 25th word, masked, optional) |
+
+Tabs are numbered, never named: `1`, `1.2`, `1.2.3`, optionally followed by what
+the node is called. A key shows `1 <comment>` from its OpenSSH key
+(`ssh-keygen -C`), or `1 <npub…wxyz>` when it has no comment. A wallet or card
+shows `1.1 <kind 0 name>`, else `1.1 <npub…wxyz>`, else just `1.1`. Numbers are
+positional and derived on every render, so closing a tab renumbers the rest. An
+uncommitted key tab reads **Add key**.
 
 Rows 2 and 3 are disabled until a key exists and are hidden while a fixed
 section is showing. Row 3 does not need a wallet: with the default wallet tab
 selected, a card hangs off the key itself and derives the source identity with
 that BIP39 passphrase, which is what `meltify-info` does when you pass a 25th
-word to a key. The first tab of each of those rows is immutable: a green dot about a finger
-wide, carrying no text, that names the identity *above* the row in its tooltip
-(`npub…wxyz - no subaccount`, `npub…wxyz - no card`). It cannot be renamed or
-closed and is the way back to that identity once wallets or cards exist. Every
-row splits its width into equal cells — each tab and the trailing `+` alike — so
-wallets, cards, that dot tab and the `+` are all the same width at any count; a
-label too long for its cell truncates with an ellipsis rather than scrolling the row. Everything you type lives in the body under the strip, never inside
-a tab. Double-click a committed tab to rename it — the label only, never the
-secret.
+word to a key. Its cards are numbered as if that empty tab were wallet 1, so
+every card title has three parts and no part is ever 0 (`1.1.2`).
 
-A tab with no name of its own shows `npub…wxyz` — the bech32 prefix, an ellipsis
-and the last four characters. The head cannot be used: every npub starts with
-`npub`. A key whose metadata is pasted in (see below) shows its display name
-instead; key, wallet and card tabs share the rule, and a label you type always
-wins.
+The first tab of the wallet and card rows is immutable: a green dot about a
+finger wide, carrying no text, that names the identity *above* the row in its
+tooltip (`npub…wxyz - no subaccount`, `npub…wxyz - no card`). It cannot be
+labelled or closed and is the way back to that identity once wallets or cards
+exist. The body below the strips shows only the selected tab's content: an empty
+tab shows nothing at all, a selected key shows only the leaf panel, and a
+selected wallet's own panel gives way to a selected card's. Selecting a key
+returns its wallet and card rows to their default tabs; selecting a wallet
+returns its card row to the default tab.
+
+Every tab is a fixed-width cell, Chrome-style: a long title truncates with an
+ellipsis, the tab never stretches, and the row scrolls sideways once the tabs no
+longer fit. The add button is pinned to the right edge of each row, with the
+row's leftover space between it and the last tab.
 
 `Self-check`, `Key tools` and `Phrase lab` are not tabs. They are buttons in the
 dock, which sits at the bottom of the page and sticks to the bottom of the
@@ -91,11 +100,8 @@ far you have scrolled.
   key seed)`, re-encoded with the key's passphrase at bcrypt rounds 1. The UI
   never trims it and never normalises it, because `meltify-info` hashes exactly
   these bytes — `work ` and `work` are different wallets, and the form says so
-  when it sees whitespace or non-ASCII. The public name is display only, can be
-  changed at any time, and defaults to the last four characters of the node's own
-  npub once it has derived (a name you typed is never overwritten). Key, wallet and
-  card tabs share the rule — the tail rather than the head, because every npub
-  starts with the bech32 prefix `npub`.
+  when it sees whitespace or non-ASCII. There is no public name to type: the tab
+  is numbered (`Wallet 1.2`) and a kind 0 name lives in the selected tab's panel.
 - **A card tab is the BIP39 passphrase, and hiding it is the only difference.**
   Cards feed the PBKDF2 step in `buildIdentityReport({ bip39Passphrase })`, so they
   move the Nostr keys and the 28 BIP39-seeded address rows and leave the seed, the
@@ -155,7 +161,7 @@ far you have scrolled.
   six elements, with `kind` as its own element — should it ever come back.
 - **No routing at all.** Tab selection is in-memory state, not the URL, so the
   build drops into `public_html/` or a subdirectory unchanged and a reload always
-  starts from an empty **Add SSH Key** tab.
+  starts from an empty **Add key** tab.
 
 ## Deploying to cPanel
 
@@ -228,6 +234,6 @@ module workers, the symlink-free fix is to keep `assets/` intact and confirm
 booted in jsdom with a stubbed worker and driven through the real click paths:
 strip order and defaults, the disabled rows below a key, section switching, key
 commit, wallet/card drafts, the empty-private-name and duplicate refusals, the
-whitespace warning, tab rename, tab close and the global wipe. The built worker
+whitespace warning, tab close and the global wipe. The built worker
 bundle also runs against the golden seed: 46/47 self-check rows pass, the 47th
 ("no Buffer global") is browser-only and fails under Node by design.

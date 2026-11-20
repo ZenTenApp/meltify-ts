@@ -17,12 +17,12 @@ import {
   addCardDraft,
   addWalletDraft,
   getState,
+  labelOf,
   leafOf,
   newKeyDraft,
   removeCard,
   removeKey,
   removeWallet,
-  renameNode,
   resetAll,
   selectCard,
   selectWallet,
@@ -244,7 +244,7 @@ function main(): void {
       report: result.report,
       seedHex: result.seedHex,
       elapsedMs: result.elapsedMs,
-      source: info.key.source === '' ? info.key.label : info.key.source,
+      source: info.key.source === '' ? labelOf(getState(), info.key.id) : info.key.source,
       subaccount: info.kind === 'key' ? '' : info.wallet?.secret ?? '',
       bip39Passphrase: info.kind === 'card' ? info.card?.secret ?? '' : '',
       ...(result.pem === undefined ? {} : { subaccountPem: result.pem }),
@@ -300,12 +300,13 @@ function main(): void {
     return profile !== null && !profile.verified && profile.via !== 'paste' ? '?' : undefined;
   }
 
-  /** Hover text for a key tab: the label, the full npub, and its wallet count. */
-  function keyTitle(key: KeyTab): string {
+  /** Hover text for a key tab: the title, the full npub, and its wallet count. */
+  function keyTitle(state: AppState, key: KeyTab): string {
     if (key.status === 'draft') return 'Uncommitted key tab';
     const npub = key.identity === null ? '' : ` · ${key.identity.report.npub}`;
     const wallets = `${key.wallets.length} wallet${key.wallets.length === 1 ? '' : 's'}`;
-    return `${key.label} — ${wallets}${npub} · ${profileTitle(key)}`;
+    const source = key.source === '' ? 'pasted key' : key.source;
+    return `${labelOf(state, key.id)} — ${source} · ${wallets}${npub} · ${profileTitle(key)}`;
   }
 
   /** The name the default tab of the card row gives the node above it. */
@@ -314,25 +315,24 @@ function main(): void {
     return `${tag} - no card`;
   }
 
-  function renderWalletStrip(key: KeyTab | null): void {
+  function renderWalletStrip(state: AppState, key: KeyTab | null): void {
     walletStrip.root.hidden = key === null;
     if (key === null) return;
     const ready = key.status === 'ready';
     const wallets = key.wallets.map((wallet) => ({
       id: wallet.id,
-      label: wallet.label,
+      label: labelOf(state, wallet.id),
       draft: wallet.status === 'draft',
       icon: hashatarIcon(wallet.identity),
       mark: wallet.deriving ? '·' : profileMark(wallet),
       title:
         wallet.status === 'draft'
-          ? `${wallet.label} (unsaved)`
-          : `${wallet.label} — ${wallet.cards.length} card${wallet.cards.length === 1 ? '' : 's'} · ${profileTitle(wallet)}`,
+          ? `${labelOf(state, wallet.id)} (unsaved)`
+          : `${labelOf(state, wallet.id)} — ${wallet.cards.length} card${wallet.cards.length === 1 ? '' : 's'} · ${profileTitle(wallet)}`,
     }));
     walletStrip.render({
       label: 'Wallets',
       variant: 'sub',
-      fill: true,
       tabs: [
         {
           id: EMPTY_WALLET,
@@ -348,7 +348,7 @@ function main(): void {
         ...wallets,
       ],
       activeId: key.activeWallet ?? EMPTY_WALLET,
-      addLabel: wallets.length === 0 ? '+ Add wallet' : '+',
+      addLabel: '+ Add wallet',
       addTitle: 'Add wallet',
       disabled: !ready,
       disabledNote: ready ? undefined : 'add a key first',
@@ -361,13 +361,10 @@ function main(): void {
         spaces.get(key.id)?.forget(id);
         removeWallet(key.id, id);
       },
-      onRename: (id, label) => {
-        if (id !== EMPTY_WALLET) renameNode(id, label);
-      },
     });
   }
 
-  function renderCardStrip(key: KeyTab | null, wallet: WalletTab | null): void {
+  function renderCardStrip(state: AppState, key: KeyTab | null, wallet: WalletTab | null): void {
     cardStrip.root.hidden = key === null;
     if (key === null) return;
     // Cards hang off the selected wallet, or off the key itself when no wallet is
@@ -378,19 +375,18 @@ function main(): void {
     const cards = host.cards;
     const cardTabs = cards.map((card) => ({
       id: card.id,
-      label: card.label,
+      label: labelOf(state, card.id),
       draft: card.status === 'draft',
       icon: hashatarIcon(card.identity),
       mark: card.deriving ? '·' : profileMark(card),
       title:
         card.status !== 'ready'
-          ? `${card.label} (unsaved)`
-          : `${card.secret === '' ? `${card.label} — no passphrase` : `${card.label} — passphrase set`} · ${profileTitle(card)}`,
+          ? `${labelOf(state, card.id)} (unsaved)`
+          : `${card.secret === '' ? `${labelOf(state, card.id)} — no passphrase` : `${labelOf(state, card.id)} — passphrase set`} · ${profileTitle(card)}`,
     }));
     cardStrip.render({
       label: 'Cards',
       variant: 'minor',
-      fill: true,
       tabs: [
         {
           id: EMPTY_CARD,
@@ -401,7 +397,7 @@ function main(): void {
         ...cardTabs,
       ],
       activeId: host.activeCard ?? EMPTY_CARD,
-      addLabel: cardTabs.length === 0 ? '+ Add card' : '+',
+      addLabel: '+ Add card',
       addTitle: 'Add card',
       disabled: !ready,
       disabledNote: !ready
@@ -419,9 +415,6 @@ function main(): void {
         if (id === EMPTY_CARD) return;
         spaces.get(key.id)?.forget(id);
         removeCard(key.id, walletId, id);
-      },
-      onRename: (id, label) => {
-        if (id !== EMPTY_CARD) renameNode(id, label);
       },
     });
   }
@@ -517,17 +510,16 @@ function main(): void {
     majorStrip.render({
       label: 'SSH keys and sections',
       variant: 'major',
-      fill: true,
       activeId,
-      addLabel: '+',
+      addLabel: '+ Add key',
       addTitle: 'Add SSH key',
       tabs: keys.map((key) => ({
         id: key.id,
-        label: key.label,
+        label: labelOf(state, key.id),
         draft: key.status === 'draft',
         icon: hashatarIcon(key.identity),
         mark: key.deriving ? '·' : profileMark(key),
-        title: keyTitle(key),
+        title: keyTitle(state, key),
       })),
       onSelect: (id) => selectKey(id),
       onAdd: () => {
@@ -541,20 +533,19 @@ function main(): void {
         }
         removeKey(id);
       },
-      onRename: (id, label) => renameNode(id, label),
     });
 
     if (state.section !== 'key') {
-      renderWalletStrip(null);
-      renderCardStrip(null, null);
+      renderWalletStrip(state, null);
+      renderCardStrip(state, null, null);
       showSection(state.section);
       return;
     }
     const key = activeKey(state);
     if (key === null) return;
     const wallet = key.wallets.find((entry) => entry.id === key.activeWallet) ?? null;
-    renderWalletStrip(key);
-    renderCardStrip(key, wallet);
+    renderWalletStrip(state, key);
+    renderCardStrip(state, key, wallet);
     showKey(key);
     const info = leafOf(state);
     leaf.render(info, info?.node.identity ?? null);

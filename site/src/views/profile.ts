@@ -1,15 +1,15 @@
 /**
- * The kind 0 panel for one node — a key, a wallet or a card.
+ * The kind 0 panel for one node — a wallet or a card.
  *
  * Every node carries its own npub: a wallet's private name and a card's BIP39
  * passphrase each move it, so every node gets its own lookup. This panel is
- * therefore rendered wherever a node is described — under the key, under the
- * wallet, under the card — because a lookup nobody shows looks exactly like a
- * lookup that never ran.
+ * rendered for the selected tab, and only for a selected tab: an empty tab or a
+ * key shows no panel of its own.
  *
  * Nothing here is verified against the npub: the name is whatever the relay's
  * kind 0 advertises, and it is labelled unverified wherever it appears. A name
- * you paste is marked `paste`, which outranks the relay's.
+ * you paste is marked `paste`, which outranks the relay's. Tab titles are
+ * positional numbers, so a name never renames a tab.
  */
 
 import { el, message, pill, toast } from '../lib/dom.ts';
@@ -100,7 +100,7 @@ export function profilePanel(node: ProfileNode, ctx: Ctx): HTMLElement {
           class: 'btn ghost small',
           onclick: () => {
             setNodeProfile(node.id, null);
-            toast('Profile cleared — the tab goes back to its npub');
+            toast('Profile cleared');
           },
         }, ['Clear']),
       ]),
@@ -146,7 +146,7 @@ export function profilePanel(node: ProfileNode, ctx: Ctx): HTMLElement {
       via: 'paste',
       verified: false,
     });
-    toast(`Tab renamed to “${name.trim()}”`);
+    toast(`Profile set to “${name.trim()}”`);
   };
 
   body.append(

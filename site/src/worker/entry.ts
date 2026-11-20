@@ -62,6 +62,7 @@ function run(request: WorkerRequest): WorkerResult {
           seedHex: toHex(parsed.seed),
           subaccount: '',
           bip39Passphrase: request.bip39Passphrase,
+          comment: parsed.comment,
           elapsedMs: performance.now() - started,
         };
       }
@@ -79,6 +80,7 @@ function run(request: WorkerRequest): WorkerResult {
         seedHex: toHex(sub.seed),
         subaccount: label,
         bip39Passphrase: request.bip39Passphrase,
+        comment: '',
         pem: sub.pem,
         elapsedMs: performance.now() - started,
       };

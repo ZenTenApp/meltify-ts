@@ -9,8 +9,10 @@ export { MeltifyError, KeyNotPasswordProtectedError, PassphraseRequiredError, Un
 export {
   parseEncryptedOpenSSHKey,
   decodeOpenSSHPem,
+  inspectOpenSSHKey,
   isUnprotectedKey,
   sshFingerprintSha256,
+  type OpenSSHKeyInspection,
   type ParsedOpenSSHKey,
 } from './core/ssh/parse.js';
 export {

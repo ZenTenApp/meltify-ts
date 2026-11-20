@@ -8,7 +8,7 @@
 
 import { el, message, pill } from '../lib/dom.ts';
 import { createStrip, type StripOptions } from '../lib/tabstrip.ts';
-import type { Identity, LeafInfo } from '../lib/store.ts';
+import { getState, labelOf, type Identity, type LeafInfo } from '../lib/store.ts';
 import { mountChains } from './chains.ts';
 import { mountCompat } from './compat.ts';
 import { mountReport } from './report.ts';
@@ -76,10 +76,12 @@ export function mountLeaf(ctx: Ctx): LeafPanel {
 
     if (info !== null) {
       const path: { text: string; leaf: boolean }[] = [
-        { text: info.key.label, leaf: info.wallet === null && info.card === null },
+        { text: labelOf(getState(), info.key.id), leaf: info.wallet === null && info.card === null },
       ];
-      if (info.wallet !== null) path.push({ text: info.wallet.label, leaf: info.card === null });
-      if (info.card !== null) path.push({ text: info.card.label, leaf: true });
+      if (info.wallet !== null) {
+        path.push({ text: labelOf(getState(), info.wallet.id), leaf: info.card === null });
+      }
+      if (info.card !== null) path.push({ text: labelOf(getState(), info.card.id), leaf: true });
       for (const [index, part] of path.entries()) {
         if (index > 0) crumb.append(el('span', { class: 'crumb__sep' }, ['›']));
         crumb.append(el('span', { class: part.leaf ? 'crumb__leaf' : 'crumb__part' }, [part.text]));
@@ -98,10 +100,11 @@ export function mountLeaf(ctx: Ctx): LeafPanel {
     if (identity !== null && info !== null) {
       pills.append(
         pill(`source: ${identity.source}`),
-        info.wallet === null ? pill('no subaccount') : pill(`wallet: ${info.wallet.label}`),
+        pill(`fingerprint ${identity.report.fingerprint}`),
+        info.wallet === null ? pill('no subaccount') : pill(`wallet: ${labelOf(getState(), info.wallet.id)}`),
         info.card === null
           ? pill('bip39 passphrase: none')
-          : pill(`card: ${info.card.label}`, identity.bip39Passphrase === '' ? undefined : 'ok'),
+          : pill(`card: ${labelOf(getState(), info.card.id)}`, identity.bip39Passphrase === '' ? undefined : 'ok'),
         pill(`${identity.report.addresses.length} addresses`),
         pill(`derive ${identity.elapsedMs.toFixed(0)} ms`),
       );

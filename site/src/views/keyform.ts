@@ -2,12 +2,18 @@
  * Key tab body for an uncommitted key draft: load a password-protected Ed25519
  * OpenSSH key, unlock it in the worker, and commit the tab.
  *
+ * The passphrase is only offered once the armored key itself has been checked —
+ * container parses, private section is encrypted, cipher/KDF are the supported
+ * ones, and the embedded public key is Ed25519. That check needs no passphrase
+ * and no worker. The field is disabled rather than hidden, so accepting a key
+ * toggles it in place without moving anything.
+ *
  * The form is built once per key tab and kept mounted, so switching tabs never
  * loses a pasted key. Inputs are read only on submit; the committed key and its
  * unlocked source identity live in the store.
  */
 
-import { MeltifyError, isUnprotectedKey } from 'meltify-ts';
+import { MeltifyError, inspectOpenSSHKey } from 'meltify-ts';
 import { el, hint, message, toast } from '../lib/dom.ts';
 import { commitKey, type Identity, type KeyTab } from '../lib/store.ts';
 import { deriveFromKey, WorkerCallError } from '../lib/worker-client.ts';
@@ -20,18 +26,6 @@ const ERROR_HELP: Record<string, string> = {
   'invalid-mnemonic': 'The phrase is not a valid BIP39 mnemonic.',
   'marshal-randomness': 'The browser could not supply random bytes.',
 };
-
-/**
- * A malformed PEM makes `isUnprotectedKey` throw. Let the worker produce the
- * real error instead of crashing the click handler.
- */
-function looksUnprotected(pem: string): boolean {
-  try {
-    return isUnprotectedKey(pem);
-  } catch {
-    return false;
-  }
-}
 
 interface DerivedResult {
   report: Identity['report'];
@@ -46,6 +40,50 @@ function failureText(error: unknown): string {
     return help === undefined ? `${code}\n${error.message}` : `${code} — ${help}\n${error.message}`;
   }
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+}
+
+type KeyState = 'empty' | 'valid' | 'invalid';
+
+interface Inspection {
+  state: KeyState;
+  message: string;
+}
+
+/** Why the armored key cannot be used, or the fact that it can. */
+function inspectArmoredKey(pem: string): Inspection {
+  const text = pem.trim();
+  if (text === '') return { state: 'empty', message: '' };
+  let info;
+  try {
+    info = inspectOpenSSHKey(text);
+  } catch {
+    return {
+      state: 'invalid',
+      message: 'Not an OpenSSH private key. Paste the armored key or drop id_ed25519.',
+    };
+  }
+  if (!info.protected) {
+    return {
+      state: 'invalid',
+      message: 'This key has no passphrase. meltify only accepts protected keys.',
+    };
+  }
+  if (info.cipher !== 'aes256-ctr' || info.kdf !== 'bcrypt') {
+    return {
+      state: 'invalid',
+      message: `Unsupported key encryption (${info.cipher}/${info.kdf}).`,
+    };
+  }
+  if (info.keyType !== 'ssh-ed25519') {
+    return {
+      state: 'invalid',
+      message:
+        info.keyType === 'ssh-rsa'
+          ? 'RSA keys are not supported. meltify only accepts Ed25519 keys.'
+          : `Only Ed25519 keys are supported (got ${info.keyType}).`,
+    };
+  }
+  return { state: 'valid', message: 'Protected Ed25519 key accepted. Enter its passphrase.' };
 }
 
 export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HTMLElement {
@@ -64,28 +102,51 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
     autocomplete: 'off',
     placeholder: 'key passphrase',
     value: key.passphrase,
-  });
-  const name = el('input', {
-    type: 'text',
-    autocomplete: 'off',
-    spellcheck: 'false',
-    placeholder: 'optional tab name — defaults to the last 4 of the npub',
+    disabled: true,
   });
   const sourceLabel = el('span', { class: 'hint' }, [key.source]);
-  const revealPass = el('button', { type: 'button', class: 'btn ghost small' }, ['show']);
-  const addButton = el('button', { type: 'button', class: 'btn primary' }, ['Add SSH key']);
-  const notice = el('div');
+  const revealPass = el('button', { type: 'button', class: 'btn ghost small', disabled: true }, [
+    'show',
+  ]);
+  const addButton = el('button', { type: 'button', class: 'btn primary', disabled: true }, [
+    'Add key',
+  ]);
+  const notice = el('div', { class: 'keynotice' });
+
+  let keyState: KeyState = 'empty';
+
+  const refresh = (): void => {
+    const usable = keyState === 'valid';
+    passphrase.disabled = !usable;
+    revealPass.disabled = !usable;
+    addButton.disabled = !usable || passphrase.value === '';
+  };
 
   const setVisible = (visible: boolean): void => {
     passphrase.type = visible ? 'text' : 'password';
     revealPass.textContent = visible ? 'hide' : 'show';
   };
 
+  const validate = (): void => {
+    const result = inspectArmoredKey(keyText.value);
+    keyState = result.state;
+    if (result.state === 'empty') {
+      notice.replaceChildren();
+    } else if (result.state === 'valid') {
+      notice.replaceChildren(message(result.message, 'ok'));
+    } else {
+      notice.replaceChildren(message(result.message, 'err'));
+    }
+    refresh();
+  };
+
   const applyKeyText = (text: string): void => {
     keyText.value = text.trim();
     setVisible(false);
-    notice.replaceChildren();
+    validate();
   };
+
+  keyText.addEventListener('input', validate);
 
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
@@ -93,9 +154,6 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
     void file.text().then((text) => {
       applyKeyText(text);
       sourceLabel.textContent = file.name;
-      if (looksUnprotected(text)) {
-        notice.replaceChildren(message('This file has no passphrase — meltify will reject it.', 'warn'));
-      }
     });
   });
 
@@ -122,6 +180,7 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
     });
   });
   revealPass.addEventListener('click', () => setVisible(passphrase.type === 'password'));
+  passphrase.addEventListener('input', refresh);
 
   const identityOf = (result: DerivedResult, source: string): Identity => ({
     report: result.report,
@@ -140,13 +199,8 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
       notice.replaceChildren(message('Paste a key or drop a key file.', 'warn'));
       return;
     }
-    if (looksUnprotected(pem)) {
-      notice.replaceChildren(
-        message(
-          'key-not-password-protected — this key has no passphrase. meltify only accepts protected keys.',
-          'err',
-        ),
-      );
+    if (passphrase.value === '') {
+      notice.replaceChildren(message('The passphrase is empty. Enter the key’s passphrase.', 'warn'));
       return;
     }
 
@@ -160,7 +214,7 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
         pem,
         passphrase: passphrase.value,
         source,
-        label: name.value.trim(),
+        comment: result.comment,
         identity,
       });
       if (error !== null) {
@@ -172,8 +226,8 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
     } catch (error) {
       notice.replaceChildren(message(failureText(error), 'err'));
     } finally {
-      addButton.disabled = false;
-      addButton.textContent = 'Add SSH key';
+      addButton.textContent = 'Add key';
+      refresh();
     }
   }
 
@@ -192,27 +246,23 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
     sourceLabel,
   ]);
 
+  validate();
+
   return el('section', { class: 'card' }, [
     header,
     hint(
-      'Password-protected Ed25519 OpenSSH key (id_ed25519). The passphrase is used once, in a worker, and is never stored outside this page’s memory.',
+      'Password-protected Ed25519 OpenSSH key (id_ed25519). The passphrase is used once, in a worker, and is never stored outside this page’s memory. The key’s own comment, if it has one, becomes the tab title.',
     ),
     el('div', { style: 'margin-top: 14px' }, [dropTarget, fileInput]),
     el('label', { class: 'field', style: 'margin-top: 14px' }, [
       el('span', { class: 'label' }, ['or paste the armored key']),
       keyText,
     ]),
-    el('div', { class: 'split' }, [
-      el('label', { class: 'field' }, [
-        el('span', { class: 'label' }, ['passphrase']),
-        el('div', { class: 'row tight' }, [passphrase, revealPass]),
-      ]),
-      el('label', { class: 'field' }, [
-        el('span', { class: 'label' }, ['tab name (optional)']),
-        name,
-      ]),
+    el('label', { class: 'field' }, [
+      el('span', { class: 'label' }, ['passphrase']),
+      el('div', { class: 'row tight' }, [passphrase, revealPass]),
     ]),
-    el('div', { class: 'row' }, [addButton]),
     notice,
+    el('div', { class: 'row' }, [addButton]),
   ]);
 }
