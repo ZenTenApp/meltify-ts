@@ -1,3 +1,20 @@
+# [1.5.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.4.0...v1.5.0) (2026-11-20)
+
+
+### Bug Fixes
+
+* hide wallets and cards when viewing utility tabs ([14e16b2](https://github.com/ZenTenApp/meltify-ts/commit/14e16b2ce858a31ec8cf90d67e5080e6a7428c21))
+
+
+### Features
+
+* add tabs ([d8a053d](https://github.com/ZenTenApp/meltify-ts/commit/d8a053d7c86773e524f4b386242b7a88aea15137))
+* allow default wallet and card ([9a6ce03](https://github.com/ZenTenApp/meltify-ts/commit/9a6ce036ce285c745236a259f395c8de81dc792e))
+* chrome-style tabs ([1347d38](https://github.com/ZenTenApp/meltify-ts/commit/1347d386b36dc3fcf7adcba082773308ab811c0a))
+* default tabs ([6c6a209](https://github.com/ZenTenApp/meltify-ts/commit/6c6a209e4cd925697fb6d61e4daf016e05921959))
+* remove throwaway key ([6451f14](https://github.com/ZenTenApp/meltify-ts/commit/6451f1445985f2156792e2b201f7df02873f951a))
+* style changes in web app and kind 0 profile ([522aa37](https://github.com/ZenTenApp/meltify-ts/commit/522aa373f849bb60d4c89779e8d70e321ca8900c))
+
 # [1.4.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.3.0...v1.4.0) (2026-11-10)
 
 
