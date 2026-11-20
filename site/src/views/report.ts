@@ -7,7 +7,8 @@ import type { IdentityReport } from 'meltify-ts';
 import { copyAction, valueBlock } from '../lib/blocks.ts';
 import { downloadText } from '../lib/download.ts';
 import { el, hint, pill, toast } from '../lib/dom.ts';
-import { clearIdentity, subscribe, type AppState, type Identity } from '../lib/store.ts';
+import type { Identity } from '../lib/store.ts';
+import type { IdentityView } from './identity-view.ts';
 import type { Ctx } from '../app-types.ts';
 
 const SECRET_FIELDS = [
@@ -65,22 +66,18 @@ function footer(identity: Identity): HTMLElement {
   ]);
 }
 
-export function mountReport(ctx: Ctx): HTMLElement {
+export function mountReport(ctx: Ctx): IdentityView {
   const root = el('div', { class: 'view' });
 
   const emptyState = (): HTMLElement =>
     el('section', { class: 'card' }, [
       el('div', { class: 'empty' }, [
         el('h2', {}, ['No identity yet']),
-        el('p', { class: 'hint' }, ['Derive an identity from a key, or use a throwaway key.']),
-        el('div', { class: 'row', style: 'justify-content: center; margin-top: 14px' }, [
-          el('a', { class: 'btn primary', href: '#/derive' }, ['Go to Derive']),
-        ]),
+        el('p', { class: 'hint' }, ['Add a key above; the report appears once a tab has something to derive.']),
       ]),
     ]);
 
-  const render = (state: AppState): void => {
-    const identity = state.identity;
+  const render = (identity: Identity | null): void => {
     if (identity === null) {
       root.replaceChildren(emptyState());
       return;
@@ -171,11 +168,10 @@ export function mountReport(ctx: Ctx): HTMLElement {
           type: 'button',
           class: 'btn ghost',
           onclick: () => {
-            clearIdentity();
-            toast('Identity wiped from memory');
-            ctx.go('derive');
+            ctx.wipe();
+            toast('Every tab, key and derivation wiped from memory');
           },
-        }, ['Wipe and go to Derive']),
+        }, ['Wipe everything']),
       ]),
       hint(exportHint(identity)),
     ]);
@@ -183,6 +179,5 @@ export function mountReport(ctx: Ctx): HTMLElement {
     root.replaceChildren(secrets, publicCard, exportCard);
   };
 
-  subscribe(render);
-  return root;
+  return { root, render };
 }

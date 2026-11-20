@@ -8,10 +8,12 @@ identity report. No server, no uploads, no analytics.
 site/
   index.html            app shell (asset placeholders filled at build time)
   src/
-    main.ts             hash router, tabs, global wipe
-    app-types.ts        TabId + view context
-    lib/                dom, clipboard, download, hex, store, worker client, value blocks
-    views/              derive, report, chains, compat, phrases, keys, selfcheck
+    main.ts             shell: three tab strips, body routing, derive driver, wipe
+    app-types.ts        shell context for the fixed section views
+    lib/                dom, clipboard, download, hex, store (tab tree), tabstrip,
+                        worker client, value blocks
+    views/              keyform, keyspace, leaf, report, chains, compat, phrases, keys,
+                        selfcheck
     worker/entry.ts     derive worker (bcrypt/AES + all derivations)
     styles/main.css
   public/.htaccess      CSP + caching for Apache/cPanel (copied into dist)
@@ -35,17 +37,52 @@ PORT=8080 npm run site:serve
 `site/dist/` is the deployable artifact: `index.html`, `assets/` (hashed, immutable),
 and `.htaccess`.
 
-## What each tab does
+## Layout
 
-| Tab | Feature |
-| --- | --- |
-| Derive | File drop or paste, passphrase, subaccount label and BIP39 passphrase (both optional, both recommended), throwaway key (pinned seed `00..1f` or random; its fixed `test-passphrase` and `test-bip39-passphrase` are filled in and shown) |
-| Report | Secret + public blocks, per-field reveal, public/full JSON export, subaccount key download, wipe |
-| Chains | 30 labeled addresses grouped by family, plus the Monero subaddresses and Cake/Unstoppable rows from `buildMoneroReport`; filter, CSV export |
-| meltify-info | `renderText` output in meltify-info's own colours, `.txt` download (plain form is the parity target) |
-| Phrase lab | seed → MELT/CryptoNote phrase plus the `meltify-monero` section (Monero primary + subaddresses 0,1–0,9, Cake/Unstoppable seed and its addresses), phrase → BIP39 seed, 25-word phrase → Monero/Beldex primaries and subaddresses + BChat |
-| Key tools | Marshal a new password-protected key (rounds 1 or 16) and hand it to Derive |
-| Self-check | Re-runs the pinned Go vectors against the loaded bundle |
+Two nested browser-style tab strips under a strip of SSH keys, and the chrome
+docked at the bottom:
+
+| Row | Strip | Add button | Body below it |
+| --- | --- | --- | --- |
+| 1 | SSH key tabs | **+ Add key**, always labelled | draft tab body: file drop or paste, then a passphrase that stays disabled until the armored key validates as a protected Ed25519 key; **Add key** unlocks in the worker |
+| 2 | Wallets (subaccounts) | **+ Add wallet**, always labelled | draft tab body: **private name** (the subaccount string, hashed verbatim) |
+| 3 | Cards (BIP39 passphrases) | **+ Add card**, always labelled | draft tab body: **secret** (the 25th word, masked, optional) |
+
+Tabs are numbered, never named: `1`, `1.2`, `1.2.3`, optionally followed by what
+the node is called. A key shows `1 <comment>` from its OpenSSH key
+(`ssh-keygen -C`), or `1 <npub…wxyz>` when it has no comment. A wallet or card
+shows `1.1 <kind 0 name>`, else `1.1 <npub…wxyz>`, else just `1.1`. Numbers are
+positional and derived on every render, so closing a tab renumbers the rest. An
+uncommitted key tab reads **Add key**.
+
+Rows 2 and 3 are disabled until a key exists and are hidden while a fixed
+section is showing. Row 3 does not need a wallet: with the default wallet tab
+selected, a card hangs off the key itself and derives the source identity with
+that BIP39 passphrase, which is what `meltify-info` does when you pass a 25th
+word to a key. Its cards are numbered as if that empty tab were wallet 1, so
+every card title has three parts and no part is ever 0 (`1.1.2`).
+
+The first tab of the wallet and card rows is immutable: a green dot about a
+finger wide, carrying no text, that names the identity *above* the row in its
+tooltip (`npub…wxyz - no subaccount`, `npub…wxyz - no card`). It cannot be
+labelled or closed and is the way back to that identity once wallets or cards
+exist. The body below the strips shows only the selected tab's content: an empty
+tab shows nothing at all, a selected key shows only the leaf panel, and a
+selected wallet's own panel gives way to a selected card's. Selecting a key
+returns its wallet and card rows to their default tabs; selecting a wallet
+returns its card row to the default tab.
+
+Every tab is a fixed-width cell, Chrome-style: a long title truncates with an
+ellipsis, the tab never stretches, and the row scrolls sideways once the tabs no
+longer fit. The add button is pinned to the right edge of each row, with the
+row's leftover space between it and the last tab.
+
+`Self-check`, `Key tools` and `Phrase lab` are not tabs. They are buttons in the
+dock, which sits at the bottom of the page and sticks to the bottom of the
+viewport: brand, the three sections, the **hashatar** toggle, **wipe on tab hide**
+and **Wipe now**. Keeping the chrome below the strips is what puts the first tab
+flush with the top of the page, and a sticky dock keeps wipe reachable however
+far you have scrolled.
 
 ## Design notes
 
@@ -58,15 +95,26 @@ and `.htaccess`.
 - **Masking is cosmetic and per field.** Seed, phrase, nsec, and the private-key
   body each carry their own reveal button on the Report tab, but they are plain
   strings in memory — same caveat as the terminal tool.
-- **Subaccounts are a label on Derive, not a tab, and the label is optional.** Filling
-  it derives the child identity in the same worker call and re-encodes the key with
-  the same passphrase at bcrypt rounds 1, exactly like `meltify-info --subaccount`.
-  Every other tab then shows the subaccount's identity, the Report footer names the
-  label, and the Report export offers the re-encoded subaccount key. An empty label
-  is the source key, the same as the library. The label is not secret, and it is the
-  only thing that has to be remembered to get the subaccount back, so the field is
-  labeled *optional, recommended* and *Try a throwaway key* fills in
-  `my-throwaway-subaccount` to show the recommended path.
+- **A wallet tab is a subaccount, and its private name is hashed verbatim.** The
+  private name is exactly the `--subaccount` string: `seed = SHA256(SHA256(utf8(private name)) ‖
+  key seed)`, re-encoded with the key's passphrase at bcrypt rounds 1. The UI
+  never trims it and never normalises it, because `meltify-info` hashes exactly
+  these bytes — `work ` and `work` are different wallets, and the form says so
+  when it sees whitespace or non-ASCII. There is no public name to type: the tab
+  is numbered (`Wallet 1.2`) and a kind 0 name lives in the selected tab's panel.
+- **A card tab is the BIP39 passphrase, and hiding it is the only difference.**
+  Cards feed the PBKDF2 step in `buildIdentityReport({ bip39Passphrase })`, so they
+  move the Nostr keys and the 28 BIP39-seeded address rows and leave the seed, the
+  phrases, the SSH key, Monero and Beldex alone. `@scure/bip39` applies NFKD itself,
+  so the UI adds no normalisation of its own. An empty card is a real card: the
+  standard derivation, the one `meltify-info` produces.
+- **Cards belong to an identity, not to a wallet.** A card list hangs off the
+  selected wallet, and off the key itself when the empty wallet tab is selected:
+  the passphrase applies to whatever identity is showing, and a 25th word moves
+  nothing but BIP39-seeded rows, so no subaccount is needed to be a real
+  derivation. The duplicate rule is scoped the same way — the same passphrase may
+  exist once on a wallet and once on the key, because the seeds they act on
+  differ.
 - **The BIP39 passphrase is optional too, and recommended the same way.** It is fed
   to the PBKDF2 step in `buildIdentityReport({ bip39Passphrase })`, so it moves the
   Nostr keys and the 28 BIP39-seeded address rows and leaves the seed, the phrases,
@@ -80,10 +128,40 @@ and `.htaccess`.
   the binary's private-value colour; anything unmasked is green. The
   meltify-info tab reuses `renderText({ color: true })` and converts its SGR
   sequences to spans (`lib/ansi.ts`), so the palette is never duplicated here.
+  The empty wallet and empty card tabs borrow that green: they hold no secret,
+  and with no label they cannot name one.
 - **Clipboard has a fallback.** `navigator.clipboard` needs a secure context;
   the legacy `execCommand` path keeps copy working over plain http on a LAN.
-- **Hash routing only.** No rewrite rules needed, so the build drops into
-  `public_html/` or a subdirectory unchanged.
+- **Every tab carries a hashatar, behind a switch.** Key, wallet and card tabs
+  draw a 14px avatar before their name, keyed on that node's whole npub, so two
+  nodes that differ by one character look different. The **hashatar** toggle in
+  the dock hides them, and while it is off no image is generated at all. `@hashatar/react` is a React component and this
+  shell is plain DOM, so it uses the generator underneath it (`@hashatar/core`),
+  paints the same 32×32 grid to a canvas, and caches the PNG as a `data:` URI —
+  strips re-render on every store change, and the CSP already allows `data:`
+  images. Nothing leaves the page (the generator is `js-sha256` over the string).
+  A key has its npub as soon as it unlocks; a wallet or card has none until it
+  derives, so its avatar appears then.
+- **Kind 0 comes from relays, unverified.** Every wallet and card of a key is
+  derived as soon as the key unlocks — not only the one whose tab is open —
+  because each node has its own npub and therefore its own profile. When a node
+  has an npub and no profile, the shell opens one subscription per relay (the CSP
+  names exactly these: the kind 0 indexers `purplepag.es`, `user.kindpag.es`,
+  `directory.yabu.me`, `profiles.nostr1.com`, then `relay.primal.net`,
+  `relay.snort.social` and `nos.lol`) for `{"kinds":[0],"authors":[…]}`. The name
+  is whatever a relay's event advertises — `display_name`, else `name`, newest
+  `created_at` winning — so **nothing is verified against the npub**: any relay
+  can put a name on a tab, and the tab marks that name with `?` while the panel
+  says `unverified · <relay>`. A name you paste yourself is marked `paste` and
+  outranks the relay's. One round, no retries, no wall-clock deadline: a round
+  ends when every relay has finished (EOSE, CLOSED, an error, or sending nothing
+  at all for 20 s). Nothing about the report depends on any of it, and no
+  `picture` is loaded. Verification (NIP-01 id + BIP340 signature) is absent on
+  purpose; NIP-01 serialises `[0, pubkey, created_at, kind, tags, content]` —
+  six elements, with `kind` as its own element — should it ever come back.
+- **No routing at all.** Tab selection is in-memory state, not the URL, so the
+  build drops into `public_html/` or a subdirectory unchanged and a reload always
+  starts from an empty **Add key** tab.
 
 ## Deploying to cPanel
 
@@ -99,7 +177,7 @@ Do not upload into the document root itself: the `.htaccess` here sets a
 site-wide CSP and year-long `immutable` caching for every `.js`/`.css` beneath
 it, which would break whatever else lives there.
 
-The links in `index.html` are relative and routing is hash-only, so no build
+The links in `index.html` are relative and there is no routing, so no build
 change is needed for the subdirectory and no rewrite rules are involved.
 
 The canonical URL ends in a slash: `https://nostr.box/meltify/`. Relative asset
@@ -136,13 +214,15 @@ Prerequisites, all outside the repo:
 
 Then check:
 
-1. `https://nostr.box/meltify/` loads, and the badge says "offline by policy".
-2. DevTools → Network shows exactly two requests after load (no third parties).
+1. `https://nostr.box/meltify/` loads, and the badge says "keys stay local".
+2. DevTools → Network shows two requests for the page itself after load. Opening a
+   key adds one websocket per relay for its kind 0 profile, and nothing else.
 3. Response headers include the `Content-Security-Policy` from `.htaccess`.
    cPanel needs `mod_headers` enabled (it is on standard cPanel/Apache builds).
-4. **Try a throwaway key** works — it needs `crypto.getRandomValues`, which is
-   available over http too, but serve over HTTPS anyway: without a secure
-   context the clipboard falls back to the legacy path.
+4. Adding a wallet and a card under a key works — those need
+   `crypto.getRandomValues` only for the key form, which is available over http
+   too, but serve over HTTPS anyway: without a secure context the clipboard falls
+   back to the legacy path.
 
 The worker is a separate file under `assets/`. If your host blocks or mangles
 module workers, the symlink-free fix is to keep `assets/` intact and confirm
@@ -150,8 +230,10 @@ module workers, the symlink-free fix is to keep `assets/` intact and confirm
 
 ## Verification
 
-`npm run verify` includes `site:typecheck`. Beyond that, the build was checked
-by booting the bundle in jsdom (7 views mount, worker URL resolves) and by
-running the built worker bundle against the golden seed: 46/47 self-check rows
-pass, the 47th ("no Buffer global") is browser-only and fails under Node by
-design.
+`npm run verify` includes `site:typecheck`. Beyond that, the built bundle was
+booted in jsdom with a stubbed worker and driven through the real click paths:
+strip order and defaults, the disabled rows below a key, section switching, key
+commit, wallet/card drafts, the empty-private-name and duplicate refusals, the
+whitespace warning, tab close and the global wipe. The built worker
+bundle also runs against the golden seed: 46/47 self-check rows pass, the 47th
+("no Buffer global") is browser-only and fails under Node by design.

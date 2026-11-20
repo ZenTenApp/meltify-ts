@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { isUnprotectedKey, parseEncryptedOpenSSHKey, sshFingerprintSha256 } from '../src/core/ssh/parse.js';
+import { isUnprotectedKey, inspectOpenSSHKey, parseEncryptedOpenSSHKey, sshFingerprintSha256 } from '../src/core/ssh/parse.js';
 import { marshalOpenSSHEd25519Key } from '../src/core/ssh/marshal.js';
 import { ed25519 } from '@noble/curves/ed25519.js';
 
@@ -33,6 +33,24 @@ describe('OpenSSH parsing', () => {
   it('detects protected vs unprotected keys without a passphrase', () => {
     expect(isUnprotectedKey(readFileSync(join(here, 'fixtures/id_ed25519_open'), 'utf8'))).toBe(true);
     expect(isUnprotectedKey(readFileSync(join(here, 'fixtures/id_ed25519_a16'), 'utf8'))).toBe(false);
+  });
+
+  it('inspects a key without its passphrase', () => {
+    const protectedKey = inspectOpenSSHKey(readFileSync(join(here, 'fixtures/id_ed25519_a16'), 'utf8'));
+    expect(protectedKey).toEqual({
+      cipher: 'aes256-ctr',
+      kdf: 'bcrypt',
+      keyType: 'ssh-ed25519',
+      protected: true,
+    });
+    expect(inspectOpenSSHKey(readFileSync(join(here, 'fixtures/id_ed25519_open'), 'utf8'))).toMatchObject({
+      keyType: 'ssh-ed25519',
+      protected: false,
+    });
+    expect(inspectOpenSSHKey(readFileSync(join(here, 'fixtures/id_rsa_protected'), 'utf8')).keyType).toBe(
+      'ssh-rsa',
+    );
+    expect(() => inspectOpenSSHKey('not a key')).toThrow(/no OpenSSH private key/);
   });
 
   it('rejects unprotected keys', () => {

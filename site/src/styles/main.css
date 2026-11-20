@@ -49,40 +49,76 @@ body {
   border-radius: 8px;
 }
 
-/* ---------- header ---------- */
+/* ---------- dock ----------
+   The brand, the utility sections and the controls live at the bottom, so the
+   first tab strip is flush with the top of the page. It sticks to the bottom of
+   the viewport, which keeps wipe reachable however far you have scrolled. */
 
-.top {
+.dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 12;
   display: flex;
   gap: 16px;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  max-width: 1080px;
   width: 100%;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 22px 20px 10px;
+  padding: 10px 20px;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid var(--border);
+}
+
+.dock__sections {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.dock__link {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.dock__link:hover {
+  color: var(--text);
+  background: var(--bg-2);
+}
+.dock__link--on {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--panel);
 }
 
 .brand {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
 .mark {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
-  border-radius: 9px;
+  border-radius: 8px;
   background: linear-gradient(160deg, #1f6feb, #0b3d91);
   color: #fff;
-  font-size: 17px;
+  font-size: 14px;
   box-shadow: 0 0 0 1px #2a3a52 inset;
 }
 
 .brand-text h1 {
-  font-size: 19px;
+  font-size: 14px;
   line-height: 1.2;
   margin: 0;
   letter-spacing: 0.01em;
@@ -91,12 +127,12 @@ body {
   color: var(--muted);
 }
 .tag {
-  margin: 2px 0 0;
+  margin: 1px 0 0;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 11px;
 }
 
-.topmeta {
+.dock__meta {
   display: flex;
   gap: 10px;
   align-items: center;
@@ -126,46 +162,268 @@ body {
   accent-color: var(--accent);
 }
 
-/* ---------- tabs ---------- */
+/* ---------- tab strips ----------
+   Three nested strips drawn as real tabs: every tab is a rounded box, and the
+   selected one is lifted out of the row in the panel colour with an accent
+   edge on top. Level is shown by indent and type size, nothing else. */
 
-.tabs {
-  display: flex;
-  gap: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
+.strips {
   max-width: 1080px;
   width: 100%;
-  margin: 6px auto 0;
+  margin: 0 auto;
   padding: 0 12px;
-  border-bottom: 1px solid var(--border-soft);
   position: sticky;
   top: 0;
   z-index: 10;
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
   backdrop-filter: blur(6px);
 }
-.tabs::-webkit-scrollbar {
+
+.strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  border-bottom: 1px solid var(--border-soft);
+  min-height: 44px;
+}
+.strip + .strip {
+  border-top: none;
+}
+.strip__list {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 3px;
+  align-items: flex-end;
+  overflow-x: auto;
+  scrollbar-width: none;
+  min-width: 0;
+  padding-top: 4px;
+}
+.strip__list::-webkit-scrollbar {
   display: none;
 }
-.tabs a {
+.strip--sub {
+  padding-left: 10px;
+  min-height: 38px;
+}
+.strip--minor {
+  padding-left: 20px;
+  min-height: 34px;
+}
+.strip--off {
+  opacity: 0.5;
+}
+/* `display: flex` above beats the UA rule for [hidden]; say it explicitly. */
+.strip[hidden],
+.keyspace[hidden] {
+  display: none;
+}
+.strip__note {
+  font-size: 11px;
   color: var(--muted);
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 11px 12px 9px;
-  border-bottom: 2px solid transparent;
+  align-self: center;
   white-space: nowrap;
 }
-.tabs a:hover {
+
+.tabitem {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  transition: background 0.12s, border-color 0.12s;
+}
+.tabitem:hover {
+  background: var(--bg-2);
+  border-color: var(--border);
+}
+/* The selected tab is a panel-coloured box with an accent edge on top, so it
+   reads as a tab pulled forward out of the row. */
+.tabitem--active {
+  background: var(--panel);
+  border-color: var(--border);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.tab {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 10px 13px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 17rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tab:hover:not(:disabled) {
   color: var(--text);
 }
-.tabs a[aria-current="page"] {
+.tab[aria-selected="true"] {
   color: var(--text);
-  border-bottom-color: var(--accent);
 }
-.tabs a[aria-disabled="true"] {
+.tab--draft {
+  font-style: italic;
+}
+.tab--section {
+  color: var(--muted);
+}
+/* The immutable empty tab at the left of the wallet and card rows. No label, so
+   the only thing it carries is the palette's public/unmasked colour: it names
+   no secret and can be neither renamed nor closed. */
+.tab--plain {
+  /* A finger-width target, no wider: the tab carries a dot, and the label it
+     would have carried lives in the tooltip. The wrapper sets its width. */
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+  text-align: center;
+}
+.tab--plain::before {
+  content: '';
+  display: inline-block;
+  vertical-align: middle;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--public);
+  opacity: 0.45;
+}
+.tab--plain:hover:not(:disabled)::before,
+.tab--plain[aria-selected='true']::before {
+  opacity: 1;
+}
+.tab:disabled {
+  cursor: default;
+}
+.tab__mark {
+  color: var(--accent);
+  margin-left: 4px;
+}
+
+/* A wallet's hashatar: 14px of the same 32×32 grid the generator produces, so
+   pixels stay square. Decorative — the label next to it is the name. */
+.tab__icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -2px;
+  image-rendering: pixelated;
+}
+.strip--minor .tab__icon {
+  width: 12px;
+  height: 12px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+
+.strip--sub .tab {
+  font-size: 12.5px;
+  padding: 8px 11px 7px;
+  max-width: 14rem;
+}
+.strip--minor .tab {
+  font-size: 11.5px;
+  padding: 6px 9px 6px;
+  max-width: 13rem;
+}
+
+.tab__x {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 9px 9px;
+  margin: auto 0 auto -6px;
+  min-width: 26px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.tabitem:hover .tab__x,
+.tab[aria-selected="true"] + .tab__x {
+  opacity: 1;
+}
+.tab__x:hover {
+  background: #232e3c;
+  color: var(--text);
+}
+
+/* The add button is always labelled ("+ Add wallet"), never a bare `+`, so the
+   row says what it adds even when it is full. */
+.tabadd {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: 1px dashed var(--border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 12px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tabadd:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.tabadd:disabled {
   opacity: 0.4;
-  pointer-events: none;
+  cursor: not-allowed;
+}
+.strip--sub .tabadd {
+  font-size: 12.5px;
+  padding: 8px 10px 7px;
+}
+.strip--minor .tabadd {
+  font-size: 11.5px;
+  padding: 6px 9px 6px;
+}
+
+.tabsep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 7px 7px;
+}
+
+/* Every tab is a fixed-width cell, Chrome-style: a long title truncates instead
+   of stretching the tab, and the strip scrolls sideways once the tabs no longer
+   fit. The list takes the row's spare space, so the add button stays pinned to
+   the right edge with the empty space between it and the last tab. The plain dot
+   tab at the head of the wallet and card rows keeps its finger-width cell. */
+.strip--major .tabitem {
+  flex: 0 0 176px;
+}
+.strip--sub .tabitem {
+  flex: 0 0 152px;
+}
+.strip--minor .tabitem {
+  flex: 0 0 136px;
+}
+.tabitem--plain {
+  flex: 0 0 3.25rem;
+}
+.strip--minor .tabitem--plain,
+.strip--sub .tabitem--plain {
+  flex: 0 0 3rem;
+}
+.tabitem .tab {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+}
+.strip > .tabadd {
+  flex: 0 0 auto;
+  margin-left: 8px;
 }
 
 /* ---------- layout ---------- */
@@ -175,7 +433,7 @@ main {
   max-width: 1080px;
   width: 100%;
   margin: 0 auto;
-  padding: 22px 20px 48px;
+  padding: 22px 20px 64px;
 }
 
 .view[hidden] {
@@ -232,6 +490,17 @@ main {
 }
 .hint.tight {
   margin: 6px 0 0;
+}
+
+/* The key form's validation line is always in the flow, so accepting a key
+   toggles the passphrase in place without moving the form. */
+.keynotice {
+  min-height: 20px;
+  margin: 10px 0 8px;
+}
+input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .mono {
@@ -546,7 +815,7 @@ code {
   max-width: 1080px;
   width: 100%;
   margin: 0 auto;
-  padding: 18px 20px 40px;
+  padding: 18px 20px 20px;
   border-top: 1px solid var(--border-soft);
   color: var(--muted);
   font-size: 12px;
@@ -609,4 +878,135 @@ code {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ---------- key space: strips + panels ---------- */
+
+/* One panel per row — key, wallet, card, then the leaf — with an even gap
+   between them. `gap` rather than margins so an empty slot leaves no hole. */
+.keyspace {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.keyspace > div:empty {
+  display: none;
+}
+.keyspace > div > .card {
+  margin-bottom: 0;
+}
+
+.inline-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+.card > h2.inline-title {
+  font-size: 13.5px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+  margin: 0;
+}
+
+.draftcard {
+  border-style: dashed;
+  border-color: #33445c;
+  background: #111823;
+}
+
+/* ---------- leaf panel ---------- */
+
+.leaf {
+  margin-top: 18px;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.leaf__head {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.leaf__head .pills {
+  margin-top: 0;
+}
+.leaf__body {
+  margin-top: 14px;
+}
+.crumb {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  font-size: 12.5px;
+  color: var(--muted);
+  min-height: 18px;
+}
+.crumb__part {
+  color: var(--muted);
+}
+.crumb__leaf {
+  color: var(--text);
+  font-weight: 700;
+}
+.crumb__sep {
+  color: #46556a;
+}
+
+/* ---------- kind 0 metadata ----------
+   Pasted, never fetched: the page has no network, so a display name is exactly
+   what the user brings and is labelled local wherever it appears. */
+
+.k0box {
+  margin-top: 12px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 10px;
+}
+.k0box summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.k0box summary:hover {
+  color: var(--text);
+}
+.k0 {
+  width: 100%;
+  min-height: 88px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+/* ---------- kind 0 relay list ----------
+   Every relay in the last round, so "nothing found" says where it looked. */
+
+.relaylist {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.relaylist li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.relaylist .ok {
+  color: var(--public);
 }

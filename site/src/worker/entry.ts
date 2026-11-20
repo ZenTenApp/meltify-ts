@@ -20,7 +20,7 @@ import {
 } from 'meltify-ts';
 import { GOLDEN, GOLDEN_SEED_00_TO_1F, SUBACCOUNT_GOLDEN } from '../../../test/golden/goldens.ts';
 import { parseHex, toHex } from '../lib/hex.ts';
-import { THROWAWAY_BIP39_PASSPHRASE, THROWAWAY_PASSPHRASE } from '../lib/throwaway.ts';
+import { SELF_CHECK_BIP39_PASSPHRASE, SELF_CHECK_PASSPHRASE } from '../lib/selfcheck-key.ts';
 import type {
   CheckRow,
   SerializedError,
@@ -62,6 +62,7 @@ function run(request: WorkerRequest): WorkerResult {
           seedHex: toHex(parsed.seed),
           subaccount: '',
           bip39Passphrase: request.bip39Passphrase,
+          comment: parsed.comment,
           elapsedMs: performance.now() - started,
         };
       }
@@ -79,47 +80,8 @@ function run(request: WorkerRequest): WorkerResult {
         seedHex: toHex(sub.seed),
         subaccount: label,
         bip39Passphrase: request.bip39Passphrase,
+        comment: '',
         pem: sub.pem,
-        elapsedMs: performance.now() - started,
-      };
-    }
-    case 'throwaway': {
-      const started = performance.now();
-      const seed = parseHex(request.seedHex);
-      if (seed === null || seed.length !== 32) throw new Error('throwaway seed must be 32 hex bytes');
-      // rounds = 1: this key protects nothing, it exists to be decrypted in-page.
-      const key = marshalOpenSSHEd25519Key(seed, request.passphrase, { rounds: 1 });
-      const parsed = parseEncryptedOpenSSHKey(key.pem, request.passphrase);
-      const label = request.subaccount ?? '';
-      if (label === '') {
-        const report = buildIdentityReport({
-          seed: parsed.seed,
-          keyBodyB64: parsed.keyBodyB64,
-          bip39Passphrase: request.bip39Passphrase,
-        });
-        return {
-          op: 'throwaway',
-          report,
-          seedHex: toHex(parsed.seed),
-          pem: key.pem,
-          subaccount: '',
-          bip39Passphrase: request.bip39Passphrase,
-          elapsedMs: performance.now() - started,
-        };
-      }
-      const sub = buildSubaccountReport({
-        seed: parsed.seed,
-        label,
-        passphrase: request.passphrase,
-        bip39Passphrase: request.bip39Passphrase,
-      });
-      return {
-        op: 'throwaway',
-        report: sub.report,
-        seedHex: toHex(sub.seed),
-        pem: key.pem,
-        subaccount: label,
-        bip39Passphrase: request.bip39Passphrase,
         elapsedMs: performance.now() - started,
       };
     }
@@ -166,12 +128,12 @@ function selfCheck(): WorkerResult {
 
   try {
     const seed = GOLDEN_SEED_00_TO_1F;
-    const key = marshalOpenSSHEd25519Key(seed, THROWAWAY_PASSPHRASE, {
+    const key = marshalOpenSSHEd25519Key(seed, SELF_CHECK_PASSPHRASE, {
       rounds: 1,
       checkBytes: Uint8Array.from([1, 2, 3, 4]),
       salt: Uint8Array.from({ length: 16 }, (_, index) => index),
     });
-    const parsed = parseEncryptedOpenSSHKey(key.pem, THROWAWAY_PASSPHRASE);
+    const parsed = parseEncryptedOpenSSHKey(key.pem, SELF_CHECK_PASSPHRASE);
     check('decrypted seed round-trips', toHex(parsed.seed), toHex(seed));
     check('key body echoed verbatim', parsed.keyBodyB64, key.keyBodyB64);
 
@@ -232,7 +194,7 @@ function selfCheck(): WorkerResult {
     const withPassphrase = buildIdentityReport({
       seed: parsed.seed,
       keyBodyB64: parsed.keyBodyB64,
-      bip39Passphrase: THROWAWAY_BIP39_PASSPHRASE,
+      bip39Passphrase: SELF_CHECK_BIP39_PASSPHRASE,
     });
     check('bip39 passphrase: 24-word phrase unchanged', withPassphrase.mnemonic24, GOLDEN.mnemonic24);
     check(
@@ -276,16 +238,16 @@ function selfCheck(): WorkerResult {
     check('no Buffer global', typeof (globalThis as { Buffer?: unknown }).Buffer, 'undefined');
 
     // Subaccount: derived seed and the downstream fields pinned for label 'alice'.
-    const source = parseEncryptedOpenSSHKey(key.pem, THROWAWAY_PASSPHRASE);
+    const source = parseEncryptedOpenSSHKey(key.pem, SELF_CHECK_PASSPHRASE);
     const sub = buildSubaccountReport({
       seed: source.seed,
       label: SUBACCOUNT_GOLDEN.label,
-      passphrase: THROWAWAY_PASSPHRASE,
+      passphrase: SELF_CHECK_PASSPHRASE,
     });
     check('subaccount seed', toHex(sub.seed), SUBACCOUNT_GOLDEN.seedHex);
     check('subaccount 24-word MELT phrase', sub.report.mnemonic24, SUBACCOUNT_GOLDEN.mnemonic24);
     check('subaccount npub', sub.report.npub, SUBACCOUNT_GOLDEN.npub);
-    const subparsed = parseEncryptedOpenSSHKey(sub.pem, THROWAWAY_PASSPHRASE);
+    const subparsed = parseEncryptedOpenSSHKey(sub.pem, SELF_CHECK_PASSPHRASE);
     check('subaccount key round-trips', toHex(subparsed.seed), SUBACCOUNT_GOLDEN.seedHex);
   } catch (error) {
     rows.push({

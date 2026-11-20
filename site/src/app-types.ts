@@ -1,12 +1,16 @@
-export type TabId =
-  | 'derive'
-  | 'report'
-  | 'chains'
-  | 'compat'
-  | 'phrases'
-  | 'keys'
-  | 'selfcheck';
+/** Shell context handed to the fixed section views. */
+
+import type { SectionId } from './lib/store.ts';
+
+export type { SectionId };
 
 export interface Ctx {
-  go(tab: TabId): void;
+  /** Show one of the fixed top-row sections (self-check, key tools, phrase lab). */
+  section(id: SectionId): void;
+  /** Open the key draft tab, optionally pre-filled (Key tools → "Open in Derive"). */
+  newKey(pem?: string, passphrase?: string): void;
+  /** Clear every tab, key, wallet, card and cached derivation. */
+  wipe(): void;
+  /** Ask the relays again for this node's kind 0, ignoring what was already asked. */
+  searchProfiles(nodeId: string): void;
 }

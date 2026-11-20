@@ -14,7 +14,7 @@
 </IfModule>
 
 <IfModule mod_headers.c>
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src wss://purplepag.es wss://user.kindpag.es wss://directory.yabu.me wss://profiles.nostr1.com wss://relay.primal.net wss://relay.snort.social wss://nos.lol; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
   Header always set Referrer-Policy "no-referrer"
   Header always set X-Content-Type-Options "nosniff"
   Header always set Cross-Origin-Opener-Policy "same-origin"

@@ -8,8 +8,8 @@ import { copyAction } from '../lib/blocks.ts';
 import { downloadText } from '../lib/download.ts';
 import { el, hint, pill, toast } from '../lib/dom.ts';
 import { parseHex } from '../lib/hex.ts';
-import { subscribe, type AppState } from '../lib/store.ts';
-import type { Ctx } from '../app-types.ts';
+import type { Identity } from '../lib/store.ts';
+import type { IdentityView } from './identity-view.ts';
 
 /** The 14 derivations, arranged into the families the report flattens alphabetically. */
 const GROUPS: readonly { title: string; labels: readonly string[] }[] = [
@@ -95,20 +95,17 @@ function csvOf(rows: readonly AddressRow[]): string {
   return `label,address\n${rows.map((row) => `${csvField(row.label)},${csvField(row.address)}`).join('\n')}\n`;
 }
 
-export function mountChains(_ctx: Ctx): HTMLElement {
+export function mountChains(): IdentityView {
   const root = el('div', { class: 'view' });
 
-  const render = (state: AppState): void => {
-    const identity = state.identity;
+  const render = (identity: Identity | null): void => {
     if (identity === null) {
       root.replaceChildren(
         el('section', { class: 'card' }, [
           el('div', { class: 'empty' }, [
             el('h2', {}, ['No addresses yet']),
             el('p', { class: 'hint' }, ['Derive an identity first.']),
-            el('div', { class: 'row', style: 'justify-content: center; margin-top: 14px' }, [
-              el('a', { class: 'btn primary', href: '#/derive' }, ['Go to Derive']),
-            ]),
+            el('p', { class: 'hint' }, ['Add a key above; addresses appear once something is derived.']),
           ]),
         ]),
       );
@@ -221,6 +218,5 @@ export function mountChains(_ctx: Ctx): HTMLElement {
     draw();
   };
 
-  subscribe(render);
-  return root;
+  return { root, render };
 }

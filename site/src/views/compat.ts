@@ -9,23 +9,20 @@ import { ansiToNodes } from '../lib/ansi.ts';
 import { copyAction } from '../lib/blocks.ts';
 import { downloadText } from '../lib/download.ts';
 import { el, hint, pill } from '../lib/dom.ts';
-import { subscribe, type AppState } from '../lib/store.ts';
-import type { Ctx } from '../app-types.ts';
+import type { Identity } from '../lib/store.ts';
+import type { IdentityView } from './identity-view.ts';
 
-export function mountCompat(_ctx: Ctx): HTMLElement {
+export function mountCompat(): IdentityView {
   const root = el('div', { class: 'view' });
 
-  const render = (state: AppState): void => {
-    const identity = state.identity;
+  const render = (identity: Identity | null): void => {
     if (identity === null) {
       root.replaceChildren(
         el('section', { class: 'card' }, [
           el('div', { class: 'empty' }, [
             el('h2', {}, ['Nothing to render']),
             el('p', { class: 'hint' }, ['Derive an identity first.']),
-            el('div', { class: 'row', style: 'justify-content: center; margin-top: 14px' }, [
-              el('a', { class: 'btn primary', href: '#/derive' }, ['Go to Derive']),
-            ]),
+            el('p', { class: 'hint' }, ['Add a key above; the meltify-info rendering appears once something is derived.']),
           ]),
         ]),
       );
@@ -69,6 +66,5 @@ export function mountCompat(_ctx: Ctx): HTMLElement {
     );
   };
 
-  subscribe(render);
-  return root;
+  return { root, render };
 }
