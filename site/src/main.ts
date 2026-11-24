@@ -11,7 +11,7 @@
  */
 
 import './styles/main.css';
-import { must, toast } from './lib/dom.ts';
+import { el, must, toast } from './lib/dom.ts';
 import {
   activeKey,
   addCardDraft,
@@ -333,6 +333,7 @@ function main(): void {
     walletStrip.render({
       label: 'Wallets',
       variant: 'sub',
+      grid: true,
       tabs: [
         {
           id: EMPTY_WALLET,
@@ -354,7 +355,8 @@ function main(): void {
       disabledNote: ready ? undefined : 'add a key first',
       onSelect: (id) => selectWallet(key.id, id === EMPTY_WALLET ? null : id),
       onAdd: () => {
-        addWalletDraft(key.id);
+        const id = addWalletDraft(key.id);
+        if (id !== null) queueMicrotask(() => spaces.get(key.id)?.focusSecret(id));
       },
       onClose: (id) => {
         if (id === EMPTY_WALLET) return;
@@ -387,6 +389,7 @@ function main(): void {
     cardStrip.render({
       label: 'Cards',
       variant: 'minor',
+      grid: true,
       tabs: [
         {
           id: EMPTY_CARD,
@@ -409,7 +412,8 @@ function main(): void {
         selectCard(key.id, walletId, id === EMPTY_CARD ? null : id);
       },
       onAdd: () => {
-        addCardDraft(key.id, walletId);
+        const id = addCardDraft(key.id, walletId);
+        if (id !== null) queueMicrotask(() => spaces.get(key.id)?.focusSecret(id));
       },
       onClose: (id) => {
         if (id === EMPTY_CARD) return;
@@ -497,7 +501,52 @@ function main(): void {
     fetchMissingProfiles();
   }
 
+  /** Each row's active tab id, or null when the row is hidden. */
+  function stripSelections(state: AppState): { strip: ReturnType<typeof createStrip>; id: string | null }[] {
+    if (state.section !== 'key') {
+      return [
+        { strip: majorStrip, id: null },
+        { strip: walletStrip, id: null },
+        { strip: cardStrip, id: null },
+      ];
+    }
+    const key = activeKey(state);
+    if (key === null) {
+      return [
+        { strip: majorStrip, id: null },
+        { strip: walletStrip, id: null },
+        { strip: cardStrip, id: null },
+      ];
+    }
+    const wallet = key.wallets.find((entry) => entry.id === key.activeWallet) ?? null;
+    const host = wallet ?? key;
+    return [
+      { strip: majorStrip, id: key.id },
+      { strip: walletStrip, id: key.activeWallet ?? EMPTY_WALLET },
+      { strip: cardStrip, id: host.activeCard ?? EMPTY_CARD },
+    ];
+  }
+
+  /** Sliding the active tab to the second column, once per changed selection. */
+  let lastReveal = '';
+  let hasRevealed = false;
+  function revealSelection(state: AppState): void {
+    const selections = stripSelections(state);
+    const key = state.section === 'key' ? activeKey(state) : null;
+    const wallet = key?.wallets.find((entry) => entry.id === key.activeWallet) ?? null;
+    const host = wallet ?? key;
+    const counts = `${state.keys.length},${key?.wallets.length ?? 0},${host?.cards.length ?? 0}`;
+    const statuses = `${key?.status ?? ''},${wallet?.status ?? ''},${host?.status ?? ''}`;
+    const signature = `${state.section}|${selections.map((entry) => entry.id ?? '').join('|')}|${counts}|${statuses}`;
+    if (signature === lastReveal) return;
+    const smooth = hasRevealed;
+    lastReveal = signature;
+    for (const entry of selections) entry.strip.reveal(entry.id, smooth);
+    hasRevealed = true;
+  }
+
   function render(state: AppState): void {
+    maybeShowWipeNotice(state);
     const keys = state.keys;
     const activeId = state.section === 'key' ? state.activeKey : null;
     for (const entry of SECTION_BUTTONS) {
@@ -510,6 +559,7 @@ function main(): void {
     majorStrip.render({
       label: 'SSH keys and sections',
       variant: 'major',
+      grid: true,
       activeId,
       addLabel: '+ Add key',
       addTitle: 'Add SSH key',
@@ -539,6 +589,7 @@ function main(): void {
       renderWalletStrip(state, null);
       renderCardStrip(state, null, null);
       showSection(state.section);
+      revealSelection(state);
       return;
     }
     const key = activeKey(state);
@@ -549,6 +600,7 @@ function main(): void {
     showKey(key);
     const info = leafOf(state);
     leaf.render(info, info?.node.identity ?? null);
+    revealSelection(state);
     void ensureDerived(state);
     void pumpDerivations();
   }
@@ -570,10 +622,59 @@ function main(): void {
     render(getState());
   });
 
+  const dock = must<HTMLElement>('.dock');
+  const autoclear = must<HTMLInputElement>('#autoclear');
+
+  /**
+   * Shown once per page session, and only after a key is actually loaded: this
+   * is a first-run warning, not a status line that repeats after every wipe.
+   */
+  let wipeNoticeShown = false;
+  const wipeNotice = el('div', { class: 'dock__notice', role: 'status', hidden: true }, [
+    el('span', { class: 'dock__notice-text' }, [
+      el('strong', {}, ['Wipe on leaving this tab is on.']),
+      ' Keys, wallets and cards are cleared from memory when this tab is hidden.',
+    ]),
+    el('span', { class: 'dock__notice-actions' }, [
+      el('button', {
+        type: 'button',
+        class: 'btn ghost small',
+        onclick: () => {
+          autoclear.checked = false;
+          wipeNotice.hidden = true;
+          toast('Wipe on tab hide is off');
+        },
+      }, ['Turn off']),
+      el('button', {
+        type: 'button',
+        class: 'btn ghost small',
+        onclick: () => {
+          wipeNotice.hidden = true;
+        },
+      }, ['Got it']),
+    ]),
+  ]);
+  dock.prepend(wipeNotice);
+
+  function maybeShowWipeNotice(state: AppState): void {
+    if (wipeNoticeShown || !autoclear.checked) return;
+    if (!state.keys.some((key) => key.status === 'ready')) return;
+    wipeNoticeShown = true;
+    wipeNotice.hidden = false;
+  }
+
+  autoclear.addEventListener('change', () => {
+    if (!autoclear.checked) wipeNotice.hidden = true;
+  });
+
   subscribe(render);
 
+  window.addEventListener('resize', () => {
+    const state = getState();
+    for (const entry of stripSelections(state)) entry.strip.reveal(entry.id, false);
+  });
+
   // Auto-clear: a hidden tab must not keep any key, wallet or card in memory.
-  const autoclear = must<HTMLInputElement>('#autoclear');
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden' && autoclear.checked) {
       const dirty = getState().keys.some((key) => key.status === 'ready' || key.wallets.length > 0);
