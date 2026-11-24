@@ -210,12 +210,13 @@ body {
    selected one is lifted out of the row in the panel colour with an accent
    edge on top. Level is shown by type size, nothing else.
 
-   Every app row has a first column for the empty/plain tab and a second column
-   where its selected tab sits. Rows scroll independently, so selecting a tab
-   only slides the row it belongs to. */
+   Every app row scrolls its tabs independently. The selected tab sits at the
+   left edge, including the empty/plain tab, and the add button is pinned to the
+   right edge at the same width as a tab. */
 
 .strips {
   --tab-w: 168px;
+  --tab-h: 40px;
   --strip-gap: 3px;
   max-width: 1080px;
   width: 100%;
@@ -276,21 +277,16 @@ body {
 
 /* ---------- app rows ----------
    Each row is its own horizontal scroller: selecting a tab slides that row until
-   the tab sits in the second column, while the first column stays put for the
-   empty/plain tab. The add button follows the row's last tab, then sticks at the
-   right edge once it would leave the row. */
+   the tab sits at the left edge. The add button is pinned to the right edge and
+   is the same width as a tab. */
 
 .strip--grid {
   display: flex;
   align-items: flex-end;
   gap: 0;
   padding-left: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-.strip--grid::-webkit-scrollbar {
-  display: none;
+  /* Same row height for keys, wallets and cards, whatever their type size. */
+  min-height: 44px;
 }
 .strip--grid.strip--sub,
 .strip--grid.strip--minor {
@@ -298,56 +294,43 @@ body {
 }
 .strip--grid > .strip__list {
   display: flex;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   align-items: flex-end;
   gap: var(--strip-gap);
   padding-top: 4px;
   min-width: 0;
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
-/* Every cell in an app row, including the blank/plain rail, is one tab wide. */
-.strip--grid .tabblank,
+/* Every tab in an app row is one fixed-width, fixed-height cell. */
 .strip--grid .tabitem {
   flex: 0 0 var(--tab-w);
   width: var(--tab-w);
   min-width: var(--tab-w);
+  height: var(--tab-h);
 }
 
-/* The first column stays put while the rest of the row slides under it. */
-.strip--grid .tabblank,
-.strip--grid .tabitem--plain {
-  position: sticky;
-  left: 0;
-  z-index: 3;
-  background: var(--bg);
-}
-.strip--grid .tabitem--plain.tabitem--active {
-  background: var(--panel);
-}
-.strip--grid .tabblank {
-  align-self: stretch;
-}
-
-/* The add button follows the row's last tab, then sticks at the right edge once
-   it would leave the viewport. Its opaque background lets tabs pass underneath. */
+/* The add button lives outside the scroller, so it never moves. */
 .strip--grid .strip__tail {
   display: flex;
   flex: 0 0 auto;
   align-items: flex-end;
   gap: 8px;
   margin-left: var(--strip-gap);
-  position: sticky;
-  right: 0;
-  z-index: 4;
   background: var(--bg);
-  box-shadow: -16px 0 16px -12px var(--bg);
+}
+.strip--grid .strip__tail > .tabadd {
+  flex: 0 0 var(--tab-w);
+  width: var(--tab-w);
+  height: var(--tab-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Sized by reveal(): enough empty track that the last tab can reach column two. */
+/* Enough empty track inside the scroller for the last tab to reach the left. */
 .strip--grid .strip__end {
-  flex: 0 0 auto;
-  width: 0;
+  flex: 0 0 max(0px, calc(100% - var(--tab-w)));
   height: 0;
 }
 

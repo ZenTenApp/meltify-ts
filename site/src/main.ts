@@ -356,7 +356,12 @@ function main(): void {
       onSelect: (id) => selectWallet(key.id, id === EMPTY_WALLET ? null : id),
       onAdd: () => {
         const id = addWalletDraft(key.id);
-        if (id !== null) queueMicrotask(() => spaces.get(key.id)?.focusSecret(id));
+        if (id !== null) {
+          queueMicrotask(() => {
+            scrollDetailsToTop();
+            spaces.get(key.id)?.focusSecret(id);
+          });
+        }
       },
       onClose: (id) => {
         if (id === EMPTY_WALLET) return;
@@ -413,7 +418,12 @@ function main(): void {
       },
       onAdd: () => {
         const id = addCardDraft(key.id, walletId);
-        if (id !== null) queueMicrotask(() => spaces.get(key.id)?.focusSecret(id));
+        if (id !== null) {
+          queueMicrotask(() => {
+            scrollDetailsToTop();
+            spaces.get(key.id)?.focusSecret(id);
+          });
+        }
       },
       onClose: (id) => {
         if (id === EMPTY_CARD) return;
@@ -527,22 +537,26 @@ function main(): void {
     ];
   }
 
-  /** Sliding the active tab to the second column, once per changed selection. */
-  let lastReveal = '';
+  /**
+   * Keeps each row's active tab at the left edge. Called after every render:
+   * during a smooth scroll a render replaces the list, so re-issuing the target
+   * lets the new list continue from the offset it inherited.
+   */
   let hasRevealed = false;
   function revealSelection(state: AppState): void {
-    const selections = stripSelections(state);
-    const key = state.section === 'key' ? activeKey(state) : null;
-    const wallet = key?.wallets.find((entry) => entry.id === key.activeWallet) ?? null;
-    const host = wallet ?? key;
-    const counts = `${state.keys.length},${key?.wallets.length ?? 0},${host?.cards.length ?? 0}`;
-    const statuses = `${key?.status ?? ''},${wallet?.status ?? ''},${host?.status ?? ''}`;
-    const signature = `${state.section}|${selections.map((entry) => entry.id ?? '').join('|')}|${counts}|${statuses}`;
-    if (signature === lastReveal) return;
     const smooth = hasRevealed;
-    lastReveal = signature;
-    for (const entry of selections) entry.strip.reveal(entry.id, smooth);
+    for (const entry of stripSelections(state)) entry.strip.reveal(entry.id, smooth);
     hasRevealed = true;
+  }
+
+  /** Scrolls the page so the detail panel starts below the sticky strips. */
+  function scrollDetailsToTop(): void {
+    const top =
+      body.getBoundingClientRect().top + window.scrollY - stripHost.getBoundingClientRect().height;
+    const target = Math.max(0, top);
+    if (Math.abs(target - window.scrollY) < 1) return;
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    window.scrollTo({ top: target, behavior });
   }
 
   function render(state: AppState): void {
@@ -574,6 +588,7 @@ function main(): void {
       onSelect: (id) => selectKey(id),
       onAdd: () => {
         newKeyDraft();
+        queueMicrotask(scrollDetailsToTop);
       },
       onClose: (id) => {
         const space = spaces.get(id);

@@ -7,10 +7,8 @@
  * or a key's own OpenSSH comment, so there is nothing to rename in place.
  *
  * The three app strips render with `grid: true`: each is its own horizontal
- * scroller, and selecting a tab slides that row until the tab sits in the second
- * column. The first column stays put for the empty/plain tab. The add button
- * follows that row's last tab, and becomes sticky at the right edge when the row
- * overflows.
+ * scroller, and selecting a tab slides that row until the tab sits at the left
+ * edge. The add button is pinned to the right edge and is one tab wide.
  */
 
 import { el } from './dom.ts';
@@ -52,9 +50,8 @@ export interface StripOptions {
   disabledNote?: string;
   variant: 'major' | 'sub' | 'minor';
   /**
-   * Renders as an app row: a fixed first column plus its own horizontal
-   * scroller. Off for the leaf panel's standalone strip, which has no rail or
-   * add column.
+   * Renders as an app row: tabs scroll under a pinned add button. Off for the
+   * leaf panel's standalone strip, which has no add column.
    */
   grid?: boolean;
   onSelect(id: string): void;
@@ -65,7 +62,7 @@ export interface StripOptions {
 interface Strip {
   root: HTMLElement;
   render(options: StripOptions): void;
-  /** Scrolls a tab clear of the sticky rail and add button. */
+  /** Scrolls the selected tab to the left edge of its row. */
   reveal(activeId?: string | null, smooth?: boolean): void;
 }
 
@@ -83,6 +80,10 @@ export function createStrip(): Strip {
 
   const render = (options: StripOptions): void => {
     const grid = options.grid === true;
+    // The list is replaced on every render. Carry its scroll offset over before
+    // the new list is laid out, otherwise it starts at 0 and reveal() animates
+    // from the empty tab instead of from where the row actually was.
+    const previousScrollLeft = root.querySelector<HTMLElement>('.strip__list')?.scrollLeft ?? 0;
     const focused = document.activeElement;
     let focusTabId: string | null = null;
     let focusClose = false;
@@ -95,15 +96,6 @@ export function createStrip(): Strip {
 
     const list = el('div', { class: 'strip__list', role: 'tablist', 'aria-label': options.label });
     const buttons: HTMLButtonElement[] = [];
-    const hasPlain = options.tabs[0]?.plain === true;
-
-    // The rail is column one. Keys have no empty tab of their own, so they get
-    // a presentation-only blank cell and start in the first tab column.
-    if (grid && !hasPlain) {
-      list.append(
-        el('span', { class: 'tabblank', role: 'presentation', 'aria-hidden': 'true' }),
-      );
-    }
 
     for (const tab of options.tabs) {
       const isActive = tab.id === options.activeId && !options.disabled;
@@ -189,21 +181,17 @@ export function createStrip(): Strip {
     if (grid) {
       let tail: HTMLElement | null = null;
       if (options.addHidden !== true) {
-        // The add button follows this row's last tab, then sticks at the right
-        // edge once that button would leave the row's viewport.
+        // The tail sits outside the tab scroller, so the add button stays on the
+        // row's right edge whatever the scroller is doing.
         tail = el('span', { class: 'strip__tail' }, [
-          add,
           ...(note === null ? [] : [note]),
+          add,
         ]);
       }
-      // Trailing space, sized in reveal(), so the last tab can still slide all
-      // the way to the second column. Without it a scroller stops at its own
-      // right edge and the final tab can never reach the left.
-      root.replaceChildren(
-        list,
-        ...(tail === null ? [] : [tail]),
-        el('span', { class: 'strip__end', 'aria-hidden': 'true' }),
-      );
+      // Trailing space inside the scroller, so even the last tab can slide to
+      // the left edge. Without it a scroller stops at its own right edge.
+      list.append(el('span', { class: 'strip__end', 'aria-hidden': 'true' }));
+      root.replaceChildren(list, ...(tail === null ? [] : [tail]));
     } else {
       // The leaf strip is a plain flex row: note before add, nothing sticky.
       root.replaceChildren(
@@ -212,6 +200,11 @@ export function createStrip(): Strip {
         ...(options.addHidden === true ? [] : [add]),
       );
     }
+
+    // Put the scroller back where it was before this render. reveal() can then
+    // animate from that position to the newly selected tab.
+    void list.scrollWidth;
+    list.scrollLeft = previousScrollLeft;
 
     // Re-rendering replaces every tab. Put keyboard focus back on the same tab
     // (or its close button), otherwise ArrowRight/End drop focus to the body.
@@ -230,28 +223,8 @@ export function createStrip(): Strip {
   };
 
   const reveal = (activeId: string | null = null, smooth = true): void => {
-    const scroller = root.classList.contains('strip--grid')
-      ? root
-      : root.querySelector<HTMLElement>('.strip__list');
-    const list = root.querySelector<HTMLElement>('.strip__list');
-    if (scroller === null || list === null) return;
-
-    const rail = root.querySelector<HTMLElement>('.tabblank, .tabitem--plain');
-    const tail = root.querySelector<HTMLElement>('.strip__tail');
-    const end = root.querySelector<HTMLElement>('.strip__end');
-    const gap = parseFloat(getComputedStyle(list).columnGap) || 0;
-    const railWidth = rail?.getBoundingClientRect().width ?? 0;
-
-    // Size the trailing space so the last tab can sit in the second column:
-    // viewport − rail − tab − two gaps − add button. Re-done on every reveal so
-    // it also follows a resize or a change to the add/note width.
-    if (end !== null) {
-      const sample = root.querySelector<HTMLElement>('.tabitem:not(.tabitem--plain)');
-      const tabWidth = sample?.getBoundingClientRect().width ?? railWidth;
-      const tailWidth = tail?.getBoundingClientRect().width ?? 0;
-      const needed = scroller.clientWidth - railWidth - tabWidth - gap * 2 - tailWidth;
-      end.style.width = `${Math.max(0, needed)}px`;
-    }
+    const scroller = root.querySelector<HTMLElement>('.strip__list');
+    if (scroller === null) return;
 
     const item =
       [...root.querySelectorAll<HTMLElement>('.tabitem')].find((candidate) => {
@@ -260,14 +233,10 @@ export function createStrip(): Strip {
       }) ?? root.querySelector<HTMLElement>('.tabitem--active');
     if (item === null) return;
 
-    // The empty/plain tab is the first column itself; everything else slides to
-    // start where the first tab column begins, just right of that rail.
-    let desired = 0;
-    if (!item.classList.contains('tabitem--plain')) {
-      const target =
-        item.getBoundingClientRect().left - scroller.getBoundingClientRect().left + scroller.scrollLeft;
-      desired = Math.max(0, target - railWidth - gap);
-    }
+    // Every tab, empty ones included, slides to the scroller's left edge.
+    const target =
+      item.getBoundingClientRect().left - scroller.getBoundingClientRect().left + scroller.scrollLeft;
+    const desired = Math.max(0, target);
     if (Math.abs(desired - scroller.scrollLeft) < 1) return;
 
     const behavior = smooth && !reducedMotion() ? 'smooth' : 'auto';

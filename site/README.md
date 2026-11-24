@@ -73,18 +73,16 @@ returns its wallet and card rows to their default tabs; selecting a wallet
 returns its card row to the default tab.
 
 Each row is its own horizontal scroller; the rows do not share a scroll
-position. The first grid column is the empty/plain rail, and it is one tab wide:
-keys have a blank cell there and start in the first tab column, while the wallet
-and card rows keep their immutable empty tab pinned there. Selecting a tab
-slides that row until the tab sits in the second column, immediately right of
-the rail. Every tab is a fixed-width cell, Chrome-style: a long title truncates
-with an ellipsis, and the tab never stretches. The row has enough trailing space
-that even its last tab can reach the second column.
+position. All three rows are the same height. The empty/plain tab scrolls like
+any other tab. Selecting a tab slides that row until the tab sits at the left
+edge, and the row has enough trailing space that even its last tab can reach
+that edge. Every tab is a fixed-width, fixed-height cell, Chrome-style: a long
+title truncates with an ellipsis, and the tab never stretches.
 
-Each add button follows that row's last tab in normal flow, leaving the rest of
-a wide row empty. Once the row overflows, the add button sticks to the right
-edge and tabs scroll underneath it. Because the buttons follow their own rows,
-they only line up vertically when those rows happen to have the same tab count.
+Each add button is pinned to its row's right edge and is the same fixed width as
+a tab. Tabs scroll in the area to its left. Adding a new item selects it,
+scrolls it into view at the left edge, and scrolls the page to the top of the
+detail panel below the strips.
 
 `Self-check`, `Key tools` and `Phrase lab` are not tabs. They are buttons in the
 dock, which sits at the bottom of the page and sticks to the bottom of the
