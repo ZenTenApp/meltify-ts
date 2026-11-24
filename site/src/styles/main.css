@@ -139,6 +139,49 @@ body {
   flex-wrap: wrap;
 }
 
+/* First-run warning, inside the sticky dock so it never covers the controls it
+   is talking about. It appears once per page session. */
+.dock__notice {
+  flex: 1 0 100%;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border: 1px solid #5c4a17;
+  border-radius: 8px;
+  background: #241d0c;
+  color: #f0d68a;
+  font-size: 12.5px;
+  animation: notice-in 0.18s ease-out;
+}
+.dock__notice[hidden] {
+  display: none;
+}
+.dock__notice strong {
+  color: var(--text);
+}
+.dock__notice-text {
+  flex: 1 1 36ch;
+  min-width: 0;
+}
+.dock__notice-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .badge {
   font-size: 11.5px;
   color: var(--accent-2);
@@ -165,9 +208,15 @@ body {
 /* ---------- tab strips ----------
    Three nested strips drawn as real tabs: every tab is a rounded box, and the
    selected one is lifted out of the row in the panel colour with an accent
-   edge on top. Level is shown by indent and type size, nothing else. */
+   edge on top. Level is shown by type size, nothing else.
+
+   Every app row has a first column for the empty/plain tab and a second column
+   where its selected tab sits. Rows scroll independently, so selecting a tab
+   only slides the row it belongs to. */
 
 .strips {
+  --tab-w: 168px;
+  --strip-gap: 3px;
   max-width: 1080px;
   width: 100%;
   margin: 0 auto;
@@ -225,6 +274,85 @@ body {
   white-space: nowrap;
 }
 
+/* ---------- app rows ----------
+   Each row is its own horizontal scroller: selecting a tab slides that row until
+   the tab sits in the second column, while the first column stays put for the
+   empty/plain tab. The add button follows the row's last tab, then sticks at the
+   right edge once it would leave the row. */
+
+.strip--grid {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  padding-left: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.strip--grid::-webkit-scrollbar {
+  display: none;
+}
+.strip--grid.strip--sub,
+.strip--grid.strip--minor {
+  padding-left: 0;
+}
+.strip--grid > .strip__list {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  gap: var(--strip-gap);
+  padding-top: 4px;
+  min-width: 0;
+  overflow: visible;
+}
+
+/* Every cell in an app row, including the blank/plain rail, is one tab wide. */
+.strip--grid .tabblank,
+.strip--grid .tabitem {
+  flex: 0 0 var(--tab-w);
+  width: var(--tab-w);
+  min-width: var(--tab-w);
+}
+
+/* The first column stays put while the rest of the row slides under it. */
+.strip--grid .tabblank,
+.strip--grid .tabitem--plain {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--bg);
+}
+.strip--grid .tabitem--plain.tabitem--active {
+  background: var(--panel);
+}
+.strip--grid .tabblank {
+  align-self: stretch;
+}
+
+/* The add button follows the row's last tab, then sticks at the right edge once
+   it would leave the viewport. Its opaque background lets tabs pass underneath. */
+.strip--grid .strip__tail {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  gap: 8px;
+  margin-left: var(--strip-gap);
+  position: sticky;
+  right: 0;
+  z-index: 4;
+  background: var(--bg);
+  box-shadow: -16px 0 16px -12px var(--bg);
+}
+
+/* Sized by reveal(): enough empty track that the last tab can reach column two. */
+.strip--grid .strip__end {
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+}
+
+/* ---------- tabs ---------- */
+
 .tabitem {
   display: inline-flex;
   align-items: stretch;
@@ -276,8 +404,8 @@ body {
    the only thing it carries is the palette's public/unmasked colour: it names
    no secret and can be neither renamed nor closed. */
 .tab--plain {
-  /* A finger-width target, no wider: the tab carries a dot, and the label it
-     would have carried lives in the tooltip. The wrapper sets its width. */
+  /* The tab carries only a dot and the label lives in its tooltip. The wrapper
+     gives it the same width as every other tab. */
   max-width: none;
   padding-left: 0;
   padding-right: 0;
@@ -388,32 +516,22 @@ body {
   padding: 6px 9px 6px;
 }
 
-.tabsep {
-  width: 1px;
-  align-self: stretch;
-  background: var(--border);
-  margin: 7px 7px;
-}
-
-/* Every tab is a fixed-width cell, Chrome-style: a long title truncates instead
-   of stretching the tab, and the strip scrolls sideways once the tabs no longer
-   fit. The list takes the row's spare space, so the add button stays pinned to
-   the right edge with the empty space between it and the last tab. The plain dot
-   tab at the head of the wallet and card rows keeps its finger-width cell. */
-.strip--major .tabitem {
+/* Fixed-width cells for the standalone leaf strip. The app rows take their
+   widths from --tab-w instead. */
+.strip:not(.strip--grid).strip--major .tabitem {
   flex: 0 0 176px;
 }
-.strip--sub .tabitem {
+.strip:not(.strip--grid).strip--sub .tabitem {
   flex: 0 0 152px;
 }
-.strip--minor .tabitem {
+.strip:not(.strip--grid).strip--minor .tabitem {
   flex: 0 0 136px;
 }
-.tabitem--plain {
+.strip:not(.strip--grid) .tabitem--plain {
   flex: 0 0 3.25rem;
 }
-.strip--minor .tabitem--plain,
-.strip--sub .tabitem--plain {
+.strip:not(.strip--grid).strip--minor .tabitem--plain,
+.strip:not(.strip--grid).strip--sub .tabitem--plain {
   flex: 0 0 3rem;
 }
 .tabitem .tab {

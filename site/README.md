@@ -62,27 +62,38 @@ that BIP39 passphrase, which is what `meltify-info` does when you pass a 25th
 word to a key. Its cards are numbered as if that empty tab were wallet 1, so
 every card title has three parts and no part is ever 0 (`1.1.2`).
 
-The first tab of the wallet and card rows is immutable: a green dot about a
-finger wide, carrying no text, that names the identity *above* the row in its
-tooltip (`npub…wxyz - no subaccount`, `npub…wxyz - no card`). It cannot be
-labelled or closed and is the way back to that identity once wallets or cards
-exist. The body below the strips shows only the selected tab's content: an empty
+The first tab of the wallet and card rows is immutable: a green dot in a tab
+cell the same width as the others, carrying no text, that names the identity
+*above* the row in its tooltip (`npub…wxyz - no subaccount`, `npub…wxyz - no
+card`). It cannot be labelled or closed and is the way back to that identity
+once wallets or cards exist. The body below the strips shows only the selected tab's content: an empty
 tab shows nothing at all, a selected key shows only the leaf panel, and a
 selected wallet's own panel gives way to a selected card's. Selecting a key
 returns its wallet and card rows to their default tabs; selecting a wallet
 returns its card row to the default tab.
 
-Every tab is a fixed-width cell, Chrome-style: a long title truncates with an
-ellipsis, the tab never stretches, and the row scrolls sideways once the tabs no
-longer fit. The add button is pinned to the right edge of each row, with the
-row's leftover space between it and the last tab.
+Each row is its own horizontal scroller; the rows do not share a scroll
+position. The first grid column is the empty/plain rail, and it is one tab wide:
+keys have a blank cell there and start in the first tab column, while the wallet
+and card rows keep their immutable empty tab pinned there. Selecting a tab
+slides that row until the tab sits in the second column, immediately right of
+the rail. Every tab is a fixed-width cell, Chrome-style: a long title truncates
+with an ellipsis, and the tab never stretches. The row has enough trailing space
+that even its last tab can reach the second column.
+
+Each add button follows that row's last tab in normal flow, leaving the rest of
+a wide row empty. Once the row overflows, the add button sticks to the right
+edge and tabs scroll underneath it. Because the buttons follow their own rows,
+they only line up vertically when those rows happen to have the same tab count.
 
 `Self-check`, `Key tools` and `Phrase lab` are not tabs. They are buttons in the
 dock, which sits at the bottom of the page and sticks to the bottom of the
 viewport: brand, the three sections, the **hashatar** toggle, **wipe on tab hide**
 and **Wipe now**. Keeping the chrome below the strips is what puts the first tab
 flush with the top of the page, and a sticky dock keeps wipe reachable however
-far you have scrolled.
+far you have scrolled. The first key that loads raises a one-time notice in the
+dock, saying that wipe on leaving the tab is on; it offers **Turn off** and
+**Got it** and does not return for the rest of the session.
 
 ## Design notes
 

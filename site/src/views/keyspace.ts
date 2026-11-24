@@ -31,6 +31,8 @@ export interface KeySpace {
   leafSlot: HTMLElement;
   /** Drops a cached draft form when its tab is closed. */
   forget(id: string): void;
+  /** Focuses a draft's secret field, e.g. after its Add button was pressed. */
+  focusSecret(id: string): void;
   render(key: KeyTab): void;
 }
 
@@ -151,9 +153,18 @@ export function mountKeySpace(key: KeyTab, ctx: Ctx): KeySpace {
     root,
     leafSlot,
     forget: forgetForm,
+    focusSecret(id) {
+      forms.get(id)?.querySelector<HTMLInputElement>('input')?.focus();
+    },
     render(current) {
       const content = selectedPanel(current);
-      panel.replaceChildren(...(content === null ? [] : [content]));
+      if (content === null) {
+        if (panel.firstChild !== null) panel.replaceChildren();
+        return;
+      }
+      // Keep the mounted node when it is already showing: replacing it would
+      // blur a focused secret field on every store update (derivations, profiles).
+      if (panel.firstChild !== content) panel.replaceChildren(content);
     },
   };
 }
