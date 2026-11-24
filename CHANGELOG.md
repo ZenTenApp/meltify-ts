@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.5.0...v1.6.0) (2026-11-24)
+
+
+### Features
+
+* tab style ([0145c47](https://github.com/ZenTenApp/meltify-ts/commit/0145c47ff70042f3d420c22ad81c09e806ea362c))
+
 # [1.5.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.4.0...v1.5.0) (2026-11-20)
 
 
