@@ -1,9 +1,10 @@
 /**
- * The leaf panel: whatever the deepest selected tab derives, as Report /
- * Chains / meltify-info. One instance for the whole app; whichever key tab is
- * showing adopts it.
+ * The leaf panel: whatever the deepest selected tab derives, as meltify-info /
+ * Chains / Report, plus the node's Profile, Settings and Info tabs. One instance
+ * for the whole app; whichever key tab is showing adopts it.
  *
- * Each panel renders lazily, so a derivation only pays for the panel on screen.
+ * Each identity panel renders lazily, so a derivation only pays for the panel on
+ * screen. Profile/Settings/Info are built from the current leaf node.
  */
 
 import { el, message, pill } from '../lib/dom.ts';
@@ -11,15 +12,21 @@ import { createStrip, type StripOptions } from '../lib/tabstrip.ts';
 import { getState, labelOf, type Identity, type LeafInfo } from '../lib/store.ts';
 import { mountChains } from './chains.ts';
 import { mountCompat } from './compat.ts';
+import { mountInfo } from './info.ts';
+import { profilePanel } from './profile.ts';
 import { mountReport } from './report.ts';
+import { mountSettings } from './settings.ts';
 import type { Ctx } from '../app-types.ts';
 
-type LeafTab = 'report' | 'chains' | 'compat';
+type LeafTab = 'compat' | 'chains' | 'report' | 'profile' | 'settings' | 'info';
 
 const LEAF_TABS = [
-  { id: 'report', label: 'Report', section: true },
-  { id: 'chains', label: 'Chains', section: true },
   { id: 'compat', label: 'meltify-info', section: true },
+  { id: 'chains', label: 'Chains', section: true },
+  { id: 'report', label: 'Report', section: true },
+  { id: 'profile', label: 'Profile', section: true },
+  { id: 'settings', label: 'Settings', section: true },
+  { id: 'info', label: 'Info', section: true },
 ] as const;
 
 export interface LeafPanel {
@@ -28,13 +35,19 @@ export interface LeafPanel {
 }
 
 export function mountLeaf(ctx: Ctx): LeafPanel {
-  const views = { report: mountReport(ctx), chains: mountChains(), compat: mountCompat() } as const;
+  const views = { report: mountReport(ctx), chains: mountChains(), compat: mountCompat(ctx) } as const;
+  const infoView = mountInfo();
+  const settingsView = mountSettings(ctx);
+  const profileRoot = el('div');
 
-  let active: LeafTab = 'report';
+  let active: LeafTab = 'compat';
   let info: LeafInfo | null = null;
   let identity: Identity | null = null;
-  /** What each panel was last drawn with, so switching panels stays cheap. */
-  const drawn = new Map<LeafTab, Identity | null>();
+  /** What each identity panel was last drawn with, so switching stays cheap. */
+  const drawn = new Map<keyof typeof views, Identity | null>();
+  const drawnSetting = new Map<keyof typeof views, boolean>();
+  /** The profile panel is rebuilt only when its node or lookup state changes. */
+  let profileSignature = '\u0000';
 
   const strip = createStrip();
   const crumb = el('div', { class: 'crumb' });
@@ -61,10 +74,56 @@ export function mountLeaf(ctx: Ctx): LeafPanel {
   const renderStrip = (): void => strip.render(stripOptions());
 
   const draw = (): void => {
+    if (active === 'profile') {
+      const node = info?.node ?? null;
+      const signature =
+        node === null
+          ? ''
+          : [
+              node.id,
+              node.profile?.name ?? '',
+              node.profile?.via ?? '',
+              node.profile?.createdAt ?? 0,
+              node.search?.state ?? '',
+              node.search?.at ?? 0,
+              node.search?.relays.length ?? 0,
+              node.identity?.report.npub ?? '',
+            ].join('|');
+      if (signature !== profileSignature) {
+        profileSignature = signature;
+        profileRoot.replaceChildren(
+          node === null
+            ? el('section', { class: 'card' }, [
+                el('div', { class: 'empty' }, [
+                  el('h2', {}, ['No node selected']),
+                  el('p', { class: 'hint' }, ['Select a key, wallet or card to see its profile.']),
+                ]),
+              ])
+            : profilePanel(node, ctx),
+        );
+      }
+      if (body.firstChild !== profileRoot) body.replaceChildren(profileRoot);
+      return;
+    }
+
+    if (active === 'settings') {
+      settingsView.render();
+      if (body.firstChild !== settingsView.root) body.replaceChildren(settingsView.root);
+      return;
+    }
+
+    if (active === 'info') {
+      infoView.render(info, ctx.showPrivateName());
+      if (body.firstChild !== infoView.root) body.replaceChildren(infoView.root);
+      return;
+    }
+
     const view = views[active];
-    if (drawn.get(active) !== identity) {
+    const showPrivateName = ctx.showPrivateName();
+    if (drawn.get(active) !== identity || drawnSetting.get(active) !== showPrivateName) {
       view.render(identity);
       drawn.set(active, identity);
+      drawnSetting.set(active, showPrivateName);
     }
     if (body.firstChild !== view.root) body.replaceChildren(view.root);
   };

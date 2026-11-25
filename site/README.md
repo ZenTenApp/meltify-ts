@@ -12,8 +12,8 @@ site/
     app-types.ts        shell context for the fixed section views
     lib/                dom, clipboard, download, hex, store (tab tree), tabstrip,
                         worker client, value blocks
-    views/              keyform, keyspace, leaf, report, chains, compat, phrases, keys,
-                        selfcheck
+    views/              keyform, keyspace, leaf, report, chains, compat, profile,
+                        settings, info, phrases, keys, selfcheck
     worker/entry.ts     derive worker (bcrypt/AES + all derivations)
     styles/main.css
   public/.htaccess      CSP + caching for Apache/cPanel (copied into dist)
@@ -48,6 +48,12 @@ docked at the bottom:
 | 2 | Wallets (subaccounts) | **+ Add wallet**, always labelled | draft tab body: **private name** (the subaccount string, hashed verbatim) |
 | 3 | Cards (BIP39 passphrases) | **+ Add card**, always labelled | draft tab body: **secret** (the 25th word, masked, optional) |
 
+The add-key form also has a template selector. **Normal** creates no wallet or
+card. **testnet** creates a ready wallet with private name `testnet1` and a ready
+card with BIP39 passphrase `card1`. **starter pack** creates a ready wallet and
+card using the SSH key passphrase for both. Templates add the lower tabs as if
+their forms had been submitted; the key tab stays selected.
+
 Tabs are numbered, never named: `1`, `1.2`, `1.2.3`, optionally followed by what
 the node is called. A key shows `1 <comment>` from its OpenSSH key
 (`ssh-keygen -C`), or `1 <npub…wxyz>` when it has no comment. A wallet or card
@@ -71,6 +77,16 @@ tab shows nothing at all, a selected key shows only the leaf panel, and a
 selected wallet's own panel gives way to a selected card's. Selecting a key
 returns its wallet and card rows to their default tabs; selecting a wallet
 returns its card row to the default tab.
+
+The leaf panel has its own tabs: **meltify-info**, **Chains**, **Report**,
+**Profile**, **Settings**, and **Info**. `meltify-info` opens by default.
+**Profile** follows the deepest selected node and is the only place kind 0 is
+shown. **Settings** has one session switch for showing the wallet private name
+without its reveal step; that state is shared by **Info**, the selected wallet
+panel, and the subaccount pills in **Report** and **meltify-info**. **Info** shows the defining value of the deepest node: the SSH key
+passphrase for a key, the private name for a wallet, and the BIP39 passphrase for
+a card. Key and card values keep their own reveal buttons; the Settings switch
+only controls the private name.
 
 Each row is a circular horizontal scroller; the rows do not share a scroll
 position. All three rows are the same height. The empty/plain tab scrolls like

@@ -11,8 +11,9 @@ import { downloadText } from '../lib/download.ts';
 import { el, hint, pill } from '../lib/dom.ts';
 import type { Identity } from '../lib/store.ts';
 import type { IdentityView } from './identity-view.ts';
+import type { Ctx } from '../app-types.ts';
 
-export function mountCompat(): IdentityView {
+export function mountCompat(ctx: Ctx): IdentityView {
   const root = el('div', { class: 'view' });
 
   const render = (identity: Identity | null): void => {
@@ -60,7 +61,7 @@ export function mountCompat(): IdentityView {
           pill('colour: meltify-info palette'),
           ...(identity.subaccount === ''
             ? []
-            : [pill(`subaccount: ${identity.subaccount}`, 'ok')]),
+            : [pill(`subaccount: ${ctx.showPrivateName() ? identity.subaccount : 'set'}`, 'ok')]),
         ]),
       ]),
     );

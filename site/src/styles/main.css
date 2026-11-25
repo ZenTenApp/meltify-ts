@@ -608,6 +608,36 @@ main {
   min-height: 20px;
   margin: 10px 0 8px;
 }
+
+/* Template selector inside the add-key form. A small tab-like group, not the
+   circular app strip. */
+.templatetabs {
+  display: flex;
+  gap: 3px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.templatetab {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  padding: 7px 11px;
+  cursor: pointer;
+}
+.templatetab:hover {
+  color: var(--text);
+  background: var(--bg-2);
+}
+.templatetab--on {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--border);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
 input:disabled {
   opacity: 0.55;
   cursor: not-allowed;

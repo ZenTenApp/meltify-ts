@@ -431,6 +431,52 @@ export function commitKey(id: string, input: CommitKeyInput): string | null {
   return null;
 }
 
+export interface KeyTemplateInput {
+  /** Private name for the ready wallet. */
+  walletSecret: string;
+  /** BIP39 passphrase for the ready card under that wallet. */
+  cardSecret: string;
+}
+
+/**
+ * Adds a ready wallet and card to a freshly committed key, as though both forms
+ * had been submitted. The key itself stays selected so its leaf panel opens.
+ */
+export function applyKeyTemplate(keyId: string, input: KeyTemplateInput): void {
+  update((draft) => {
+    const key = draft.keys.find((entry) => entry.id === keyId);
+    if (key === undefined || key.status !== 'ready') return;
+    if (key.wallets.length > 0 || key.cards.length > 0) return;
+
+    const card: CardTab = {
+      id: nid('c'),
+      secret: input.cardSecret,
+      status: 'ready',
+      identity: null,
+      deriving: false,
+      error: null,
+      profile: null,
+      search: null,
+    };
+    const wallet: WalletTab = {
+      id: nid('w'),
+      secret: input.walletSecret,
+      status: 'ready',
+      identity: null,
+      deriving: false,
+      error: null,
+      profile: null,
+      search: null,
+      cards: [card],
+      activeCard: null,
+    };
+    key.wallets.push(wallet);
+    // The key tab stays selected; the template only populates the rows below it.
+    key.activeWallet = null;
+    key.activeCard = null;
+  });
+}
+
 /**
  * How a tab writes an npub it has no name for: `npub…wxyz`.
  *

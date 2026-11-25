@@ -1,10 +1,9 @@
 /**
- * The kind 0 panel for one node — a wallet or a card.
+ * The kind 0 panel for one node — a key, wallet or card.
  *
  * Every node carries its own npub: a wallet's private name and a card's BIP39
  * passphrase each move it, so every node gets its own lookup. This panel is
- * rendered for the selected tab, and only for a selected tab: an empty tab or a
- * key shows no panel of its own.
+ * rendered for the deepest selected tab in the leaf profile tab.
  *
  * Nothing here is verified against the npub: the name is whatever the relay's
  * kind 0 advertises, and it is labelled unverified wherever it appears. A name
