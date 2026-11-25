@@ -72,12 +72,18 @@ selected wallet's own panel gives way to a selected card's. Selecting a key
 returns its wallet and card rows to their default tabs; selecting a wallet
 returns its card row to the default tab.
 
-Each row is its own horizontal scroller; the rows do not share a scroll
+Each row is a circular horizontal scroller; the rows do not share a scroll
 position. All three rows are the same height. The empty/plain tab scrolls like
-any other tab. Selecting a tab slides that row until the tab sits at the left
-edge, and the row has enough trailing space that even its last tab can reach
-that edge. Every tab is a fixed-width, fixed-height cell, Chrome-style: a long
-title truncates with an ellipsis, and the tab never stretches.
+any other tab. A row wraps at one full cycle of its tabs, not at the viewport
+width, so the last tab is followed by the empty tab again. Every tab exists
+once: when it clears the left edge it re-enters from the right of the cycle. If
+the viewport is wider than a cycle, the extra width stays empty rather than
+showing copies.
+
+Selecting a tab slides that row until the tab sits at the left edge. Tabs can
+also be dragged or moved with a horizontal wheel, and both wrap around the same
+cycle. Every tab is a fixed-width, fixed-height cell, Chrome-style: a long title
+truncates with an ellipsis, and the tab never stretches.
 
 Each add button is pinned to its row's right edge and is the same fixed width as
 a tab. Tabs scroll in the area to its left. Adding a new item selects it,

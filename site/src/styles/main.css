@@ -210,9 +210,9 @@ body {
    selected one is lifted out of the row in the panel colour with an accent
    edge on top. Level is shown by type size, nothing else.
 
-   Every app row scrolls its tabs independently. The selected tab sits at the
-   left edge, including the empty/plain tab, and the add button is pinned to the
-   right edge at the same width as a tab. */
+   Every app row scrolls its tabs independently as a circular track. The
+   selected tab sits at the left edge, including the empty/plain tab, and the add
+   button is pinned to the right edge at the same width as a tab. */
 
 .strips {
   --tab-w: 168px;
@@ -296,11 +296,25 @@ body {
   display: flex;
   flex: 1 1 auto;
   align-items: flex-end;
-  gap: var(--strip-gap);
   padding-top: 4px;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+/* One cycle of tabs. Each real tab is wrapped by its own transform; there are
+   no duplicated tab nodes. */
+.strip__track {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  gap: var(--strip-gap);
+}
+.strip__cycle {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  gap: var(--strip-gap);
 }
 
 /* Every tab in an app row is one fixed-width, fixed-height cell. */
@@ -309,6 +323,7 @@ body {
   width: var(--tab-w);
   min-width: var(--tab-w);
   height: var(--tab-h);
+  will-change: transform;
 }
 
 /* The add button lives outside the scroller, so it never moves. */
@@ -326,12 +341,6 @@ body {
   height: var(--tab-h);
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Enough empty track inside the scroller for the last tab to reach the left. */
-.strip--grid .strip__end {
-  flex: 0 0 max(0px, calc(100% - var(--tab-w)));
-  height: 0;
 }
 
 /* ---------- tabs ---------- */
