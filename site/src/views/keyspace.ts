@@ -154,7 +154,7 @@ export function mountKeySpace(key: KeyTab, ctx: Ctx): KeySpace {
     leafSlot,
     forget: forgetForm,
     focusSecret(id) {
-      forms.get(id)?.querySelector<HTMLInputElement>('input')?.focus();
+      forms.get(id)?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
     },
     render(current) {
       const content = selectedPanel(current);
