@@ -1,3 +1,11 @@
+# [1.7.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.6.0...v1.7.0) (2026-11-25)
+
+
+### Features
+
+* infinite scroll ([f54c9ce](https://github.com/ZenTenApp/meltify-ts/commit/f54c9cece33156cf0ee1424e35dd72279768f4bc))
+* tab style changes ([2c52bca](https://github.com/ZenTenApp/meltify-ts/commit/2c52bcadc81df97638cc6b71e8ffcdb73d0f4e01))
+
 # [1.6.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.5.0...v1.6.0) (2026-11-24)
 
 
