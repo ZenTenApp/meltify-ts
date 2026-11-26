@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.7.0...v1.8.0) (2026-11-26)
+
+
+### Features
+
+* reorg layout ([5be7cf3](https://github.com/ZenTenApp/meltify-ts/commit/5be7cf37a55ca13ec86b122613e076a353a4e165))
+
 # [1.7.0](https://github.com/ZenTenApp/meltify-ts/compare/v1.6.0...v1.7.0) (2026-11-25)
 
 
