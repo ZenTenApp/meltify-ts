@@ -37,6 +37,63 @@ const common = {
 
 const hash = (buffer) => createHash('sha256').update(buffer).digest('hex').slice(0, 8);
 
+/**
+ * The deployed bundle is minified, which strips license comments, so the notices
+ * the site's code and its dependencies require ship as plain text beside it:
+ * LICENSE.txt (this project) and THIRD-PARTY-NOTICES.txt (everything bundled in).
+ */
+async function writeLicenseFiles() {
+  await cp(join(repo, 'LICENSE.md'), join(outDir, 'LICENSE.txt'));
+
+  const sections = [
+    'Third-party notices for the code served on this site.',
+    (await readFile(join(repo, 'NOTICE'), 'utf8')).trim(),
+    await vendoredNotice('src/core/crypto/bcrypt-pbkdf.ts', 'bcrypt_pbkdf + Blowfish'),
+    await vendoredNotice('src/core/derive/monero-wordlist.ts', 'Monero English word list'),
+  ];
+  for (const name of await productionPackages()) {
+    const dir = join(repo, 'node_modules', name);
+    const meta = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8'));
+    const file = (await readdir(dir)).find((f) => /^(licen[cs]e|copying)(\.(md|txt))?$/i.test(f));
+    if (file === undefined) throw new Error(`no license file in node_modules/${name}`);
+    const text = (await readFile(join(dir, file), 'utf8')).trim();
+    sections.push(`${name} ${meta.version} (${meta.license})\n\n${text}`);
+  }
+
+  const rule = `\n\n${'='.repeat(78)}\n\n`;
+  await writeFile(join(outDir, 'THIRD-PARTY-NOTICES.txt'), `${sections.join(rule)}\n`);
+  console.log('  LICENSE.txt, THIRD-PARTY-NOTICES.txt');
+}
+
+/** The license comment at the top of a vendored source file, as plain text. */
+async function vendoredNotice(path, title) {
+  const source = await readFile(join(repo, path), 'utf8');
+  const block = source.match(/^\s*\/\*\*?([\s\S]*?)\*\//);
+  let lines;
+  if (block) {
+    lines = block[1].split('\n').map((line) => line.replace(/^\s*\* ?/, ''));
+  } else {
+    const all = source.split('\n');
+    const end = all.findIndex((line) => !line.startsWith('//'));
+    lines = all.slice(0, end).map((line) => line.replace(/^\/\/ ?/, ''));
+  }
+  return `${title} (${path})\n\n${lines.join('\n').trim()}`;
+}
+
+/** Every package the site's runtime dependencies pull in, by name. */
+async function productionPackages() {
+  const seen = new Set();
+  const queue = Object.keys(JSON.parse(await readFile(join(repo, 'package.json'), 'utf8')).dependencies ?? {});
+  while (queue.length > 0) {
+    const name = queue.shift();
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const meta = JSON.parse(await readFile(join(repo, 'node_modules', name, 'package.json'), 'utf8'));
+    queue.push(...Object.keys(meta.dependencies ?? {}));
+  }
+  return [...seen].sort();
+}
+
 async function emit(sourceFile, name, extension) {
   const scratchDir = join(scratch, name);
   await build({ ...common, entryPoints: [join(root, 'src', sourceFile)], outdir: scratchDir });
@@ -92,6 +149,7 @@ async function main() {
   await cp(publicDir, outDir, { recursive: true, force: true });
   const published = await readdir(publicDir, { withFileTypes: true });
   for (const entry of published) console.log(`  ${entry.name} (from public/)`);
+  await writeLicenseFiles();
 
   await rm(scratch, { recursive: true, force: true });
 

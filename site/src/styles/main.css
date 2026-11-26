@@ -969,6 +969,10 @@ code {
 .foot .dim {
   color: #64707f;
 }
+.foot a {
+  color: var(--muted);
+  text-underline-offset: 2px;
+}
 
 .toast {
   position: fixed;
