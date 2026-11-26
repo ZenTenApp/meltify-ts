@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   addCardDraft,
   addWalletDraft,
+  applyKeyTemplate,
   commitCard,
   commitKey,
   commitWallet,
@@ -111,6 +112,25 @@ describe('tab titles', () => {
     const other = addCardDraft(keyId, second) as string;
     removeCard(keyId, second, card);
     expect(labelOf(getState(), other)).toBe('1.1.1');
+  });
+});
+
+describe('key templates', () => {
+  beforeEach(() => {
+    resetAll();
+  });
+
+  it('creates a ready wallet and card and keeps the key selected', () => {
+    const keyId = readyKey();
+    applyKeyTemplate(keyId, { walletSecret: 'passphrase', cardSecret: 'passphrase' });
+    const key = getState().keys[0];
+    expect(key.wallets).toHaveLength(1);
+    expect(key.wallets[0]?.status).toBe('ready');
+    expect(key.wallets[0]?.secret).toBe('passphrase');
+    expect(key.wallets[0]?.cards[0]?.status).toBe('ready');
+    expect(key.wallets[0]?.cards[0]?.secret).toBe('passphrase');
+    expect(key.activeWallet).toBeNull();
+    expect(key.activeCard).toBeNull();
   });
 });
 

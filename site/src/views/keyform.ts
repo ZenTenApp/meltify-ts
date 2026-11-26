@@ -15,7 +15,7 @@
 
 import { MeltifyError, inspectOpenSSHKey } from 'meltify-ts';
 import { el, hint, message, toast } from '../lib/dom.ts';
-import { commitKey, type Identity, type KeyTab } from '../lib/store.ts';
+import { applyKeyTemplate, commitKey, type Identity, type KeyTab } from '../lib/store.ts';
 import { deriveFromKey, WorkerCallError } from '../lib/worker-client.ts';
 
 const ERROR_HELP: Record<string, string> = {
@@ -112,6 +112,47 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
     'Add key',
   ]);
   const notice = el('div', { class: 'keynotice' });
+
+  type TemplateId = 'normal' | 'testnet' | 'starter';
+  const templates: readonly { id: TemplateId; label: string; description: string }[] = [
+    { id: 'normal', label: 'Normal', description: 'No wallet or card tabs are created.' },
+    {
+      id: 'testnet',
+      label: 'testnet',
+      description: 'Adds a ready wallet with private name “testnet1” and a card with BIP39 passphrase “card1”.',
+    },
+    {
+      id: 'starter',
+      label: 'starter pack',
+      description: 'Adds a ready wallet and card using this SSH key passphrase for both.',
+    },
+  ];
+  let template: TemplateId = 'normal';
+  const templateNote = el('p', { class: 'hint tight' });
+  const templateButtons = new Map<TemplateId, HTMLButtonElement>();
+  const templateRow = el('div', { class: 'templatetabs', role: 'group', 'aria-label': 'Key template' });
+
+  const setTemplate = (id: TemplateId): void => {
+    template = id;
+    for (const [entryId, button] of templateButtons) {
+      const on = entryId === id;
+      button.classList.toggle('templatetab--on', on);
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    templateNote.textContent = templates.find((entry) => entry.id === id)?.description ?? '';
+  };
+
+  for (const entry of templates) {
+    const button = el('button', {
+      type: 'button',
+      class: 'templatetab',
+      'aria-pressed': entry.id === template ? 'true' : 'false',
+    }, [entry.label]);
+    button.addEventListener('click', () => setTemplate(entry.id));
+    templateButtons.set(entry.id, button);
+    templateRow.append(button);
+  }
+  setTemplate('normal');
 
   let keyState: KeyState = 'empty';
 
@@ -221,6 +262,14 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
         notice.replaceChildren(message(error, 'err'));
         return;
       }
+      if (template === 'testnet') {
+        applyKeyTemplate(key.id, { walletSecret: 'testnet1', cardSecret: 'card1' });
+      } else if (template === 'starter') {
+        applyKeyTemplate(key.id, {
+          walletSecret: passphrase.value,
+          cardSecret: passphrase.value,
+        });
+      }
       toast('Key tab added');
       onCommitted(key.id);
     } catch (error) {
@@ -253,6 +302,11 @@ export function mountKeyForm(key: KeyTab, onCommitted: (id: string) => void): HT
     hint(
       'Password-protected Ed25519 OpenSSH key (id_ed25519). The passphrase is used once, in a worker, and is never stored outside this page’s memory. The key’s own comment, if it has one, becomes the tab title.',
     ),
+    el('div', { style: 'margin-top: 14px' }, [
+      el('span', { class: 'label' }, ['template']),
+      templateRow,
+      templateNote,
+    ]),
     el('div', { style: 'margin-top: 14px' }, [dropTarget, fileInput]),
     el('label', { class: 'field', style: 'margin-top: 14px' }, [
       el('span', { class: 'label' }, ['or paste the armored key']),

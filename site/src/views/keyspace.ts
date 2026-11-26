@@ -23,7 +23,6 @@ import {
 } from '../lib/store.ts';
 import { mountKeyForm } from './keyform.ts';
 import { mountNodeForm } from './nodeform.ts';
-import { profilePanel } from './profile.ts';
 import type { Ctx } from '../app-types.ts';
 export interface KeySpace {
   root: HTMLElement;
@@ -103,12 +102,12 @@ export function mountKeySpace(key: KeyTab, ctx: Ctx): KeySpace {
       el('h2', { class: 'inline-title' }, [labelOf(getState(), wallet.id)]),
       el('div', { class: 'blocks', style: 'margin-top: 12px' }, [
         valueBlock('private name', wallet.secret, {
-          masked: true,
+          secret: true,
+          masked: !ctx.showPrivateName(),
           note: 'hashed verbatim: SHA256(SHA256(utf8(private name)) ‖ key seed)',
         }),
       ]),
       hint('Cards below hold the BIP39 passphrase for this wallet. Add one per wallet you use.'),
-      profilePanel(wallet, ctx),
     ]);
   };
 
@@ -124,7 +123,6 @@ export function mountKeySpace(key: KeyTab, ctx: Ctx): KeySpace {
               note: 'the 25th word; PBKDF2 input, NFKD as per BIP39',
             }),
       ]),
-      profilePanel(card, ctx),
     ]);
   };
 

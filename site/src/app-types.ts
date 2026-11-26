@@ -13,4 +13,7 @@ export interface Ctx {
   wipe(): void;
   /** Ask the relays again for this node's kind 0, ignoring what was already asked. */
   searchProfiles(nodeId: string): void;
+  /** Session preference: show the wallet private name without its own reveal step. */
+  showPrivateName(): boolean;
+  setShowPrivateName(value: boolean): void;
 }

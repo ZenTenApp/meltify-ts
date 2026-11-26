@@ -77,6 +77,8 @@ function main(): void {
 
   /** Draw the hashatar before tab names. Session-only, like every other switch. */
   let showHashatar = true;
+  /** Show the wallet private name without its own reveal step. Session-only. */
+  let showPrivateName = false;
 
   const majorStrip = createStrip();
   const walletStrip = createStrip();
@@ -94,6 +96,11 @@ function main(): void {
     },
     wipe: () => wipe('Wiped from memory'),
     searchProfiles: (nodeId) => searchProfilesAgain(nodeId),
+    showPrivateName: () => showPrivateName,
+    setShowPrivateName: (value) => {
+      showPrivateName = value;
+      render(getState());
+    },
   };
 
   const leaf: LeafPanel = mountLeaf(ctx);

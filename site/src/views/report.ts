@@ -53,10 +53,12 @@ function exportHint(identity: Identity): string {
   return `${subject}${passphrase}, and every secret. Public JSON keeps the fingerprint, npub, and addresses only.`;
 }
 
-function footer(identity: Identity): HTMLElement {
+function footer(identity: Identity, showPrivateName: boolean): HTMLElement {
   return el('div', { class: 'pills' }, [
     pill(`source: ${identity.source}`),
-    ...(identity.subaccount === '' ? [] : [pill(`subaccount: ${identity.subaccount}`)]),
+    ...(identity.subaccount === ''
+      ? []
+      : [pill(`subaccount: ${showPrivateName ? identity.subaccount : 'set'}`)]),
     pill(
       identity.bip39Passphrase === '' ? 'bip39 passphrase: none' : 'bip39 passphrase: set',
     ),
@@ -83,6 +85,7 @@ export function mountReport(ctx: Ctx): IdentityView {
       return;
     }
     const report = identity.report;
+    const showPrivateName = ctx.showPrivateName();
 
     const secrets = el('section', { class: 'card' }, [
       el('h2', {}, ['Secret material']),
@@ -95,7 +98,9 @@ export function mountReport(ctx: Ctx): IdentityView {
           note:
             identity.subaccount === ''
               ? 'base64 of openssh-key-v1'
-              : `subaccount body for “${identity.subaccount}”, bcrypt rounds 1`,
+              : showPrivateName
+                ? `subaccount body for “${identity.subaccount}”, bcrypt rounds 1`
+                : 'subaccount body, bcrypt rounds 1',
         }),
         valueBlock('ed25519 seed', report.seedHex, { masked: true, note: 'hex, 32 bytes' }),
         valueBlock('melt phrase', report.mnemonic24, { masked: true, note: '24 words' }),
@@ -117,7 +122,7 @@ export function mountReport(ctx: Ctx): IdentityView {
         valueBlock('nostr public key', report.pubKeyHex, { note: 'hex' }),
         valueBlock('bchat chat id', report.bchat, { note: 'beldex' }),
       ]),
-      footer(identity),
+      footer(identity, showPrivateName),
     ]);
 
     const exportCard = el('section', { class: 'card tight' }, [
