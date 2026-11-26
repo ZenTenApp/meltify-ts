@@ -246,3 +246,7 @@ written by semantic-release, so do not edit either by hand.
 Third-party code and data notices are in [`NOTICE`](./NOTICE). Upstream meltify and this
 port are the repository owner's work; the vendored bcrypt/Blowfish code retains its
 original BSD-3/ISC notices.
+
+## License
+
+MIT. See [`LICENSE.md`](./LICENSE.md). Third-party notices are in [`NOTICE`](./NOTICE).
