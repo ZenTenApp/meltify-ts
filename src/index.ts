@@ -5,7 +5,14 @@
  * text and passphrase, and get back a structured report or rendered text.
  */
 
-export { MeltifyError, KeyNotPasswordProtectedError, PassphraseRequiredError, UnsupportedKeyTypeError, KeyParseError } from './core/errors.js';
+export {
+  MeltifyError,
+  KeyNotPasswordProtectedError,
+  PassphraseRequiredError,
+  UnsupportedKeyTypeError,
+  UnsupportedKdfRoundsError,
+  KeyParseError,
+} from './core/errors.js';
 export {
   parseEncryptedOpenSSHKey,
   decodeOpenSSHPem,
@@ -14,6 +21,7 @@ export {
   sshFingerprintSha256,
   type OpenSSHKeyInspection,
   type ParsedOpenSSHKey,
+  type ParseOptions,
 } from './core/ssh/parse.js';
 export {
   marshalOpenSSHEd25519Key,

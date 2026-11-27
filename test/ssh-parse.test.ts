@@ -2,7 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { isUnprotectedKey, inspectOpenSSHKey, parseEncryptedOpenSSHKey, sshFingerprintSha256 } from '../src/core/ssh/parse.js';
+import {
+  decodeOpenSSHPem,
+  isUnprotectedKey,
+  inspectOpenSSHKey,
+  parseEncryptedOpenSSHKey,
+  sshFingerprintSha256,
+} from '../src/core/ssh/parse.js';
+import { UnsupportedKdfRoundsError } from '../src/core/errors.js';
+import { base64 } from '@scure/base';
 import { marshalOpenSSHEd25519Key } from '../src/core/ssh/marshal.js';
 import { ed25519 } from '@noble/curves/ed25519.js';
 
@@ -116,5 +124,70 @@ describe('PEM normalisation', () => {
     const parsed = parseEncryptedOpenSSHKey(rewrapped, 'test-passphrase');
     expect(parsed.rounds).toBe(1);
     expect(parsed.seed).toHaveLength(32);
+  });
+});
+
+/**
+ * Rewrites the declared bcrypt rounds in an armored key without re-running the
+ * KDF, so tests can build a hostile key (e.g. 2^32-1 rounds) instantly. The
+ * container layout is: magic, cipher string, kdf string ("bcrypt"), then the
+ * kdfoptions string = salt string (4 + 16 bytes) followed by the u32 rounds.
+ */
+function withDeclaredRounds(pem: string, rounds: number): string {
+  const der = decodeOpenSSHPem(pem).der.slice();
+  const kdfName = new TextEncoder().encode('bcrypt');
+  const at = der.findIndex((_, i) => kdfName.every((b, j) => der[i + j] === b));
+  if (at < 0) throw new Error('fixture has no bcrypt kdf');
+  // kdf name, then u32 kdfoptions length, then u32 salt length + 16-byte salt.
+  const roundsOffset = at + kdfName.length + 4 + 4 + 16;
+  new DataView(der.buffer).setUint32(roundsOffset, rounds);
+  const body = base64.encode(der).match(/.{1,70}/g)!.join('\n');
+  return `-----BEGIN OPENSSH PRIVATE KEY-----\n${body}\n-----END OPENSSH PRIVATE KEY-----\n`;
+}
+
+describe('bcrypt rounds bounds (opt-in)', () => {
+  const a16 = readFileSync(join(here, 'fixtures/id_ed25519_a16'), 'utf8');
+  const a1 = readFileSync(join(here, 'fixtures/id_ed25519_a1'), 'utf8');
+
+  it('accepts any rounds when no range is given, as meltify does', () => {
+    expect(parseEncryptedOpenSSHKey(a1, 'test-passphrase').rounds).toBe(1);
+  });
+
+  it('accepts a key at the inclusive edges of the range', () => {
+    expect(parseEncryptedOpenSSHKey(a16, 'test-passphrase', { rounds: { min: 16, max: 16 } }).rounds).toBe(16);
+  });
+
+  it('rejects a key below the range and reports the declared count', () => {
+    const attempt = () => parseEncryptedOpenSSHKey(a16, 'test-passphrase', { rounds: { min: 128, max: 8192 } });
+    expect(attempt).toThrow(UnsupportedKdfRoundsError);
+    try {
+      attempt();
+    } catch (error) {
+      expect(error).toMatchObject({ code: 'unsupported-kdf-rounds', declaredRounds: 16, minRounds: 128, maxRounds: 8192 });
+    }
+  });
+
+  it('rejects a key above the range before running bcrypt', () => {
+    // 2^32-1 rounds would take days inside bcrypt; finishing at all proves the
+    // check runs on header metadata first.
+    const hostile = withDeclaredRounds(a16, 0xffffffff);
+    expect(() =>
+      parseEncryptedOpenSSHKey(hostile, 'test-passphrase', { rounds: { min: 128, max: 8192 } }),
+    ).toThrow(UnsupportedKdfRoundsError);
+  });
+
+  it('checks the range before the passphrase', () => {
+    // A wrong passphrase must still produce the rounds error, not a decryption error.
+    expect(() => parseEncryptedOpenSSHKey(a16, 'wrong', { rounds: { min: 128, max: 8192 } })).toThrow(
+      UnsupportedKdfRoundsError,
+    );
+  });
+
+  it.each([
+    { min: 0, max: 10 },
+    { min: 10, max: 9 },
+    { min: 1.5, max: 10 },
+  ])('rejects an invalid range $min..$max', (range) => {
+    expect(() => parseEncryptedOpenSSHKey(a16, 'test-passphrase', { rounds: range })).toThrow(RangeError);
   });
 });
