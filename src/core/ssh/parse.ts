@@ -19,6 +19,7 @@ import {
   KeyParseError,
   MeltifyError,
   PassphraseRequiredError,
+  UnsupportedKdfRoundsError,
   UnsupportedKeyTypeError,
 } from '../errors.js';
 import { SshReader } from './wire.js';
@@ -205,17 +206,44 @@ export function inspectOpenSSHKey(input: string | Uint8Array): OpenSSHKeyInspect
   };
 }
 
+export interface ParseOptions {
+  /**
+   * Inclusive range of bcrypt rounds the caller accepts. When set, a key whose
+   * declared rounds fall outside it is rejected with `UnsupportedKdfRoundsError`
+   * before bcrypt runs. Omit it to accept any count, as meltify does.
+   *
+   * The check runs before the KDF because the rounds value is unauthenticated
+   * header data: a key claiming billions of rounds would otherwise lock up the
+   * caller inside bcrypt before the passphrase is ever tested. ZenTen Vault
+   * passes `{ min: 128, max: 8192 }`.
+   */
+  rounds?: { min: number; max: number };
+}
+
+function assertRoundsRange(range: { min: number; max: number }): void {
+  const { min, max } = range;
+  if (!Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max < min) {
+    throw new RangeError(`invalid rounds range: min=${min}, max=${max}`);
+  }
+}
+
 /**
  * Parses a password-protected Ed25519 OpenSSH private key.
  *
  * Throws `KeyNotPasswordProtectedError` for unencrypted keys,
- * `PassphraseRequiredError` for an empty passphrase, and `KeyParseError` for
- * wrong passphrases or malformed input.
+ * `PassphraseRequiredError` for an empty passphrase,
+ * `UnsupportedKdfRoundsError` when `options.rounds` is set and the key falls
+ * outside it, and `KeyParseError` for wrong passphrases or malformed input.
  */
 export function parseEncryptedOpenSSHKey(
   input: string | Uint8Array,
   passphrase: string,
+  options: ParseOptions = {},
 ): ParsedOpenSSHKey {
+  // Validate the caller's range first, so a bad option is reported as a
+  // programming error rather than blamed on the key.
+  if (options.rounds) assertRoundsRange(options.rounds);
+
   const { der, b64 } = decodeOpenSSHPem(input);
   const container = readContainer(der);
 
@@ -235,6 +263,9 @@ export function parseEncryptedOpenSSHKey(
   const opts = new SshReader(container.kdfOptions);
   opts.string();
   const rounds = opts.u32();
+  if (options.rounds && (rounds < options.rounds.min || rounds > options.rounds.max)) {
+    throw new UnsupportedKdfRoundsError(rounds, options.rounds.min, options.rounds.max);
+  }
 
   const parsed = decryptPrivateSection(container, passphrase);
   return {

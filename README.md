@@ -49,6 +49,16 @@ const report = buildIdentityReport({
 console.log(renderText(report, { color: false }));
 ```
 
+To enforce a work-factor policy, pass an inclusive `rounds` range. Keys outside it are
+rejected with `UnsupportedKdfRoundsError` (carrying `declaredRounds`) before bcrypt runs,
+so a key that declares an enormous round count cannot stall the caller:
+
+```ts
+parseEncryptedOpenSSHKey(pem, passphrase, { rounds: { min: 128, max: 8192 } });
+```
+
+Without the option any round count is accepted, matching meltify.
+
 `buildIdentityReport` returns a presentation-agnostic `IdentityReport`
 (`addresses`, `npub`/`nsec`, `fingerprint`, `publicKeyLine`, `bchat`, ...).
 `renderText` reproduces meltify's terminal layout; with `color: false` it is plain text
@@ -147,7 +157,9 @@ Independent checks beyond the upstream goldens:
 - **`scReduce32`** is cross-checked against a separate BigInt mod-L reducer.
 - **OpenSSH parsing** is exercised against real `ssh-keygen` output at bcrypt rounds 1 and
   16, including unprotected, RSA, wrong-passphrase, empty-passphrase, and garbage cases.
-  The parsed key's public-key blob is compared to the `.pub` fixtures.
+  The parsed key's public-key blob is compared to the `.pub` fixtures. The opt-in `rounds`
+  range is tested at its edges, below and above it (including a hostile 2^32-1 count that
+  must fail before bcrypt), and ahead of the passphrase check.
 
 ## Architecture
 

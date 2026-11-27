@@ -9,6 +9,7 @@ export type MeltifyErrorCode =
   | 'key-not-password-protected'
   | 'passphrase-required'
   | 'unsupported-key-type'
+  | 'unsupported-kdf-rounds'
   | 'key-parse'
   | 'invalid-mnemonic'
   | 'derivation';
@@ -44,6 +45,30 @@ export class UnsupportedKeyTypeError extends MeltifyError {
   constructor(detail: string) {
     super('unsupported-key-type', detail);
     this.name = 'UnsupportedKeyTypeError';
+  }
+}
+
+/**
+ * The key declares a bcrypt work factor outside the range the caller allows.
+ *
+ * Kept separate from `KeyParseError` so a UI can say "this key's work factor
+ * is too weak or too high" instead of "this is not a valid key". The declared
+ * count is unencrypted header metadata, so it is safe to show.
+ */
+export class UnsupportedKdfRoundsError extends MeltifyError {
+  readonly declaredRounds: number;
+  readonly minRounds: number;
+  readonly maxRounds: number;
+
+  constructor(declaredRounds: number, minRounds: number, maxRounds: number) {
+    super(
+      'unsupported-kdf-rounds',
+      `key uses ${declaredRounds} bcrypt KDF rounds; accepted range is ${minRounds} to ${maxRounds}`,
+    );
+    this.name = 'UnsupportedKdfRoundsError';
+    this.declaredRounds = declaredRounds;
+    this.minRounds = minRounds;
+    this.maxRounds = maxRounds;
   }
 }
 
